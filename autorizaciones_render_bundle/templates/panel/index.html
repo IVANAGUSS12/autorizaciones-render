@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CEMIC · Panel Interno de Autorizaciones</title>
+  <!-- Front libs -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{ --verde:#0b5c3c; --bg:#f5faf7; --line:#e6eeea; --trauma-bg:#e8f2ff; --trauma-br:#cfe3ff; --trauma-tx:#1f4f91; --hemo-bg:#f3e8ff; --hemo-br:#e4d4ff; --hemo-tx:#5b2dab }
+    body{background:var(--bg)}
+    .app{display:grid; grid-template-rows:auto 1fr; height:100dvh}
+    .main{display:grid; grid-template-columns:0px 1fr 0px; height:100%; overflow:hidden; transition:grid-template-columns .25s ease}
+    .left-open  { grid-template-columns: 320px 1fr 0 }
+    .right-open { grid-template-columns: 0 1fr 360px }
+    .both-open  { grid-template-columns: 320px 1fr 360px }
+    @media (max-width:1024px){ .left-open{grid-template-columns:100% 0 0} .right-open{grid-template-columns:0 0 100%} .both-open{grid-template-columns:100% 0 0} .drawer{position:absolute; inset:56px 0 0 0; z-index:30} }
+    .drawer{height:100%; overflow:auto; background:#fff; border-left:1px solid var(--line); border-right:1px solid var(--line)}
+    .drawer-left{border-right:1px solid var(--line)}
+    .drawer-right{border-left:1px solid var(--line)}
+    .chip{display:inline-flex;align-items:center;gap:.4rem;border-radius:999px;padding:.2rem .6rem;font-size:.72rem;border:1px solid #e2e8f0;background:#f8fafc}
+    .chip-trauma{background:var(--trauma-bg); border-color:var(--trauma-br); color:var(--trauma-tx)}
+    .chip-hemo{background:var(--hemo-bg);   border-color:var(--hemo-br);   color:var(--hemo-tx)}
+    .pill{border-radius:14px;padding:.5rem .7rem;font-size:.9rem;border:1px solid #e5e7eb;background:#fff}
+    .btn{border-radius:10px;padding:.45rem .8rem;border:1px solid #e5e7eb;background:#fff}
+    .btn-primary{background:#0f3b2c;color:#fff;border-color:#0f3b2c}
+    .row{border:1px solid #e5e7eb; background:#fff; border-radius:.9rem}
+    .row + .row{margin-top:.75rem}
+    .row-head{display:grid; grid-template-columns:54px 1fr 140px 100px 170px 220px auto; gap:.6rem; align-items:center}
+    .row-head .fecha{ width:150px }
+    .row-head select.estado{ max-width:220px; width:100% }
+    @keyframes pulseSoft{0%{box-shadow:0 0 0 0 rgba(16,185,129,.6)}70%{box-shadow:0 0 0 12px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+    .pulse-soft{animation:pulseSoft 1.6s ease-out 2}
+    @media (max-width:1380px){ .row-head{grid-template-columns:54px 1fr 120px 100px 160px 200px auto} }
+    @media (max-width:1180px){ .row-head{grid-template-columns:54px 1fr 110px 100px 180px auto} .col-sector{display:none} }
+    @media (max-width:980px){ .row-head{grid-template-columns:40px 1fr auto} .col-sector{display:none} }
+    .mini-cal{display:grid; grid-template-columns: repeat(7, 1fr); gap:.5rem}
+    .mini-day{border:1px dashed #e5e7eb; border-radius:.75rem; padding:.4rem; min-height:64px; font-size:.8rem; cursor:pointer}
+    .mini-day:hover{background:#f8fafc}
+    .workspace{position:fixed; inset:56px 0 0 0; background:#f6faf8; z-index:60; display:none}
+    .workspace.open{display:grid; grid-template-rows:auto 1fr}
+    .calendar-grid{display:grid; grid-template-columns:repeat(7,minmax(180px,1fr)); gap:12px}
+    .calendar-day{border:1px solid #e5e7eb;border-radius:12px;padding:.6rem;min-height:140px;background:#fff}
+    .calendar-day .item{font-size:.78rem;line-height:1.1rem;border-radius:8px;padding:.18rem .35rem;margin-top:.25rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .calendar-day .it-trauma{background:var(--trauma-bg)}
+    .calendar-day .it-hemo{background:var(--hemo-bg)}
+    .modal{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:70}
+    .modal.open{display:flex}
+    .card{background:white; border-radius:1rem; box-shadow:0 10px 30px rgba(0,0,0,.15)}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="h-14 flex items-center gap-2 justify-between px-4 bg-white border-b border-gray-200 sticky top-0 z-20">
+    <div class="flex items-center gap-2">
+      <button id="btnLeft"  class="px-3 py-1 rounded-md bg-emerald-50 text-emerald-900 border border-emerald-200">Menú</button>
+      <h1 class="font-semibold text-emerald-900">CEMIC · Panel Interno de Autorizaciones</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="openWsCal"  class="px-3 py-1 rounded-md border">Calendario</button>
+      <button id="openWsStats" class="px-3 py-1 rounded-md border">Estadísticas</button>
+    </div>
+  </header>
+
+  <div id="grid" class="main">
+    <aside id="drawerLeft" class="drawer drawer-left p-4 hidden lg:block">
+      <div class="card p-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-emerald-800"></div>
+          <div>
+            <div class="text-sm font-medium" id="username">@usuario</div>
+            <div class="text-xs text-gray-500">Operador · Autorizaciones</div>
+          </div>
+        </div>
+        <div class="mt-4 space-y-2">
+          <button id="btnPwd" class="block w-full text-left px-3 py-2 rounded-md hover:bg-emerald-50">Cambiar contraseña</button>
+          <a class="block px-3 py-2 rounded-md hover:bg-emerald-50" href="/admin/" target="_blank">Administración</a>
+          <a class="block px-3 py-2 rounded-md hover:bg-emerald-50" href="/static/qr/index.html" target="_blank">Abrir formulario QR</a>
+        </div>
+        <div class="mt-4">
+          <button id="btnExport" class="w-full px-3 py-2 rounded-md bg-emerald-600 text-white">Exportar Excel</button>
+        </div>
+        <div class="mt-4 flex gap-2">
+          <span class="chip chip-trauma">Trauma</span>
+          <span class="chip chip-hemo">Hemo</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="h-full overflow-auto p-4">
+      <section class="card p-3 mb-3">
+        <div class="grid xl:grid-cols-10 lg:grid-cols-8 sm:grid-cols-4 grid-cols-2 gap-2 items-end">
+          <input id="q"   class="pill" placeholder="Buscar por nombre, DNI, cobertura"/>
+          <select id="cov" class="pill"><option value="">Cobertura (todas)</option></select>
+          <select id="med" class="pill"><option value="">Médico (todos)</option></select>
+          <select id="est" class="pill">
+            <option value="">Estado (todos)</option>
+            <option>Pendiente</option><option>Solicitado</option>
+            <option>Rechazado por cobertura</option>
+            <option>Autorizado</option>
+            <option>Autorizado material pendiente</option>
+          </select>
+          <select id="sec" class="pill">
+            <option value="">Sector (todos)</option>
+            <option value="trauma">Traumatología</option>
+            <option value="hemo">Hemodinamia</option>
+          </select>
+          <div class="text-xs text-gray-500">F. Carga</div>
+          <input id="fc1"  type="date" class="pill"/>
+          <input id="fc2"  type="date" class="pill"/>
+          <div class="text-xs text-gray-500">F. Cirugía</div>
+          <input id="fx1"  type="date" class="pill"/>
+          <input id="fx2"  type="date" class="pill"/>
+          <select id="sortBy" class="pill">
+            <option value="fx">Ordenar por: F. Cirugía</option>
+            <option value="fc">Ordenar por: F. Carga</option>
+            <option value="nombre">Ordenar por: Nombre</option>
+          </select>
+          <select id="sortDir" class="pill">
+            <option value="desc">Descendente</option>
+            <option value="asc">Ascendente</option>
+          </select>
+        </div>
+        <div class="mt-3 flex items-center gap-2">
+          <button id="btnRefresh" class="btn btn-primary">Actualizar</button>
+          <button id="btnClear"   class="btn">Limpiar</button>
+          <div class="ml-auto text-sm text-gray-500">Total: <span id="total">—</span></div>
+        </div>
+      </section>
+
+      <section id="list" class="mb-24"></section>
+
+      <section class="card p-3 sticky bottom-0 bg-white/95 backdrop-blur border border-gray-200 z-10">
+        <div class="flex items-center justify-between">
+          <div class="text-sm text-gray-500">Mostrando <span id="range">0–0</span></div>
+          <div class="space-x-2">
+            <button id="prev" class="px-3 py-1.5 border rounded-md">Anterior</button>
+            <button id="next" class="px-3 py-1.5 border rounded-md">Siguiente</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside id="drawerRight" class="drawer drawer-right p-4 hidden lg:block">
+      <div class="card p-4">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Calendario rápido</h3>
+          <button id="openWsCal2" class="px-2 py-1 border rounded-md">Abrir en grande</button>
+        </div>
+        <div id="miniCalendar" class="mini-cal mt-3" style="min-height:260px"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- WORKSPACE fullscreen -->
+<div id="workspace" class="workspace">
+  <div class="bg-white border-b border-gray-200 h-12 px-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <button id="wsClose" class="px-3 py-1 border rounded-md">← Volver</button>
+      <button id="wsTabCal" class="px-3 py-1 border rounded-md bg-white">Calendario</button>
+      <button id="wsTabStats" class="px-3 py-1 border rounded-md">Estadísticas</button>
+    </div>
+    <div class="text-sm text-gray-500" id="wsHint"></div>
+  </div>
+  <div id="wsBody" class="overflow-auto p-4"></div>
+</div>
+
+<!-- Modal preview -->
+<div id="modal" class="modal">
+  <div class="card w-[min(1100px,92vw)] h-[min(88vh,900px)] overflow-hidden flex flex-col">
+    <div class="flex items-center justify-between border-b px-4 h-12">
+      <div id="modalTitle" class="font-medium">Vista previa</div>
+      <button id="modalClose" class="px-3 py-1 border rounded-md">Cerrar</button>
+    </div>
+    <div id="modalBody" class="flex-1 overflow-auto"></div>
+  </div>
+</div>
+
+<script>
+/* ========= Helpers base ========= */
+const $ = sel => document.querySelector(sel);
+const grid = document.getElementById('grid');
+const drawerLeft = document.getElementById('drawerLeft');
+const drawerRight= document.getElementById('drawerRight');
+let leftOpen=false, rightOpen=false;
+function applyGrid(){
+  drawerLeft.classList.toggle('hidden', !leftOpen);
+  drawerRight.classList.toggle('hidden', !rightOpen);
+  if(leftOpen && rightOpen) grid.className='main both-open';
+  else if(leftOpen)         grid.className='main left-open';
+  else if(rightOpen)        grid.className='main right-open';
+  else                      grid.className='main';
+}
+document.getElementById('btnLeft').onclick = ()=>{ leftOpen=!leftOpen; applyGrid(); };
+
+const list = $('#list'); const totalEl = $('#total'); const rangeEl = $('#range');
+let page=1, pageSize=50, lastCount=0, currentMonth=new Date();
+let anchorId=null; // resaltar fila desde calendario
+let cachedAll=[];  // dataset para filtros/estadísticas
+let statChart;     // Chart.js instance
+
+/* ========= API ========= */
+const API = {
+  patients: (params = {}) => {
+    const q = new URLSearchParams();
+    q.set('page', params.page ?? 1);
+    q.set('page_size', params.page_size ?? 50);
+    if (params.cobertura)    q.set('cobertura', params.cobertura);
+    if (params.estado)       q.set('estado',    params.estado);
+    if (params.medico)       q.set('medico',    params.medico);
+    if (params.sector)       q.set('sector',    params.sector);          // si usás ID
+    if (params.sector__code) q.set('sector__code', params.sector__code); // si usás code
+    return `/v1/patients/?${q.toString()}`;
+  }
+};
+
+/* ========= Fetch seguro ========= */
+async function fetchJsonSafe(url, options){
+  const res = await fetch(url, { credentials:'include', ...options });
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')){
+    const text = await res.text();
+    console.error('Respuesta no JSON en', url, text.slice(0,400));
+    return { results: [], _error:'non_json' };
+  }
+  return res.json();
+}
+
+/* ========= Field map y safe getters ========= */
+const FMAP = {
+  id:       ['id','pk','uuid'],
+  name:     ['nombre','name','paciente','patient_name'],
+  dni:      ['dni','documento','document','doc'],
+  coverage: ['cobertura','coverage','obra_social','mutual'],
+  doctor:   ['medico','doctor','dr','physician'],
+  status:   ['estado','status','state'],
+  sector:   ['sector','area','unidad'],
+  sectorCode:['sector.code','sector__code','sector_codigo','sectorCode'],
+  created:  ['created_at','fecha_carga','fecha_alta','created','fc'],
+  surgery:  ['fecha_cx','fecha_intervencion','fecha_cirugia','fecha_turno','fecha','fx']
+};
+function getNested(o, k) {
+  const parts = String(k).split('.');
+  let v = o;
+  for (const p of parts) {
+    if (v == null) return null;
+    if (typeof v !== 'object') return null;
+    if (!(p in v)) return null;
+    v = v[p];
+  }
+  return v;
+}
+function pick(p, keys){ for (const k of keys){ const v = getNested(p,k); if(v!==null && v!==undefined && v!=='') return v; } return ''; }
+function pickStr(p, keys){ const v = pick(p, keys); return (v===null||v===undefined)?'':String(v); }
+function pickDateISO(p, keys){
+  const raw=pick(p, keys); if(!raw) return '';
+  try{ const d=new Date(raw); if(!isNaN(d)) return d.toISOString().slice(0,10); }catch(_){}
+  return String(raw).slice(0,10);
+}
+
+/* ========= Sector helpers ========= */
+const SECTOR_MAP = { trauma: ['trauma','TRAUMA',1,'1','Traumatología'], hemo: ['hemo','HEMO',2,'2','Hemodinamia'] };
+function sectorRaw(p){ const code = pickStr(p, FMAP.sectorCode); if (code) return code; const any = pick(p, FMAP.sector); return any != null ? any : ''; }
+function sectorCodeSafe(p){ const s = String(sectorRaw(p)).toLowerCase(); const m=v=>SECTOR_MAP[v].map(String).map(x=>x.toLowerCase()); if (m('trauma').includes(s)) return 'trauma'; if (m('hemo').includes(s)) return 'hemo'; return 'trauma'; }
+function sectorMatchesFilter(p, filterVal){ if (!filterVal) return true; const s = String(sectorRaw(p)).toLowerCase(); return (SECTOR_MAP[filterVal]||[]).map(String).map(x=>x.toLowerCase()).includes(s); }
+function sectorChip(codeOrId){ const code = (typeof codeOrId === 'string') ? codeOrId : sectorCodeSafe({ sector: codeOrId }); return (code === 'hemo') ? `<span class="chip chip-hemo">Hemo</span>` : `<span class="chip chip-trauma">Trauma</span>`; }
+
+/* ========= Render fila ========= */
+function rowTpl(p, idx){
+  const pid   = pick(p, FMAP.id);
+  const name  = pickStr(p, FMAP.name) || '-';
+  const dni   = pickStr(p, FMAP.dni);
+  const cov   = pickStr(p, FMAP.coverage);
+  const doc   = pickStr(p, FMAP.doctor);
+  const estado= pickStr(p, FMAP.status) || 'Pendiente';
+  const fCxISO = pickDateISO(p, FMAP.surgery);
+  return `
+  <article class="row p-3" id="row-${pid}">
+    <div class="row-head">
+      <div class="text-gray-400 text-sm">${idx}</div>
+      <div class="font-medium">${name}<div class="text-xs text-gray-500">${cov} · ${doc}</div></div>
+      <div class="text-sm">${dni}</div>
+      <div class="col-sector">${sectorChip(sectorCodeSafe(p))}</div>
+      <div><input type="date" class="px-2 py-1 border rounded-md fecha" value="${fCxISO}" data-id="${pid}"></div>
+      <div>
+        <select class="px-2 py-1 border rounded-md estado" data-id="${pid}">
+          ${['Pendiente','Solicitado','Rechazado por cobertura','Autorizado','Autorizado material pendiente'].map(s=>`<option ${estado===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="justify-self-end flex flex-wrap gap-2" style="min-width:240px">
+        <button class="px-3 py-1 rounded-md bg-emerald-600 text-white save" data-id="${pid}">Guardar</button>
+        <button class="px-3 py-1 rounded-md border detail" data-id="${pid}">Detalle</button>
+        <button class="px-3 py-1 rounded-md border attach" data-id="${pid}">Adjuntos</button>
+      </div>
+    </div>
+    <div id="detail-${pid}" class="hidden mt-3 grid md:grid-cols-4 gap-3">
+      <div class="p-3 rounded-md bg-gray-50 border">
+        <div class="text-sm text-gray-500">Contacto</div>
+        <div class="text-sm">Email: ${pickStr(p,['email','mail'])||'-'}</div>
+        <div class="text-sm">Tel: ${pickStr(p,['telefono','phone','tel'])||'-'}</div>
+        <div class="text-xs text-gray-400">Registro: ${(pickDateISO(p, FMAP.created)||'-').split('-').reverse().join('/')}</div>
+      </div>
+      <div class="p-3 rounded-md bg-gray-50 border"><div class="text-sm text-gray-500">Cobertura</div><div class="text-sm">${cov||'-'}</div></div>
+      <div class="p-3 rounded-md bg-gray-50 border"><div class="text-sm text-gray-500">Médico</div><div class="text-sm">${doc||'-'}</div></div>
+      <div class="p-3 rounded-md bg-gray-50 border"><div class="text-sm text-gray-500">Carpeta</div>${(p.bucket_path||p.folder_url)? `<a class="text-emerald-700 underline" target="_blank" href="${p.folder_url||'#'}">Abrir carpeta</a>`:'-'}</div>
+      <div class="md:col-span-4">
+        <details class="rounded-md border">
+          <summary class="px-3 py-2 cursor-pointer">Adjuntos · clic para ver / subir</summary>
+          <div class="p-3" id="attach-${pid}"></div>
+          <div class="p-3 flex flex-wrap gap-2 items-center">
+            <select class="pill" id="att-kind-${pid}"><option value="orden">Orden</option><option value="dni">DNI</option><option value="credencial">Credencial</option><option value="materiales">Materiales</option><option value="otro">Otro</option></select>
+            <input type="file" class="pill" id="att-file-${pid}" multiple/>
+            <button class="btn" onclick="uploadAtt(${JSON.stringify(pid)})">Subir</button>
+          </div>
+        </details>
+      </div>
+    </div>
+  </article>`;
+}
+
+/* ========= Filtros/orden ========= */
+function buildServerParamsFromUI(){
+  return {
+    page: 1, page_size: 5000,
+    cobertura: $('#cov').value || '',
+    estado:    $('#est').value || '',
+    medico:    $('#med').value || '',
+    sector__code: $('#sec').value || '' // si tu UI usa ID, cambia por 'sector'
+  };
+}
+function textMatch(hay, needle){ if(!needle) return true; const s=(hay||'').toString().toLowerCase(); const n=needle.toLowerCase(); return s.includes(n); }
+function inRange(val, d1, d2){ if(!val) return false; return (!d1||val>=d1)&&(!d2||val<=d2); }
+function createdDate(p){ return pickDateISO(p, FMAP.created); }
+function surgeryDate(p){ return pickDateISO(p, FMAP.surgery); }
+function applyFilters(rows){
+  const q=$('#q').value.trim(); const cov=$('#cov').value; const med=$('#med').value; const est=$('#est').value; const sec=$('#sec').value;
+  const fc1=$('#fc1').value, fc2=$('#fc2').value; const fx1=$('#fx1').value, fx2=$('#fx2').value;
+  return rows.filter(p=>{
+    const estado=pickStr(p, FMAP.status);
+    const medico=pickStr(p, FMAP.doctor);
+    const cobertura=pickStr(p, FMAP.coverage);
+    const fCarga = createdDate(p);
+    const fCx    = surgeryDate(p);
+    const nameOrDni = (pickStr(p,FMAP.name) || pickStr(p,FMAP.dni));
+    return textMatch(nameOrDni, q)
+      && (!cov || cobertura===cov)
+      && (!med || medico===med)
+      && (!est || estado===est)
+      && sectorMatchesFilter(p, sec)
+      && (!fc1 && !fc2 || inRange(fCarga, fc1, fc2))
+      && (!fx1 && !fx2 || inRange(fCx, fx1, fx2));
+  });
+}
+function applySort(rows){
+  const by=$('#sortBy').value; const dir=$('#sortDir').value==='asc'?1:-1;
+  return rows.slice().sort((a,b)=>{
+    let av,bv;
+    if(by==='fc'){ av=createdDate(a)||''; bv=createdDate(b)||''; }
+    else if(by==='fx'){ av=surgeryDate(a)||''; bv=surgeryDate(b)||''; }
+    else { av=(pickStr(a,FMAP.name)||'').toLowerCase(); bv=(pickStr(b,FMAP.name)||'').toLowerCase(); }
+    if(av<bv) return -1*dir; if(av>bv) return 1*dir; return 0;
+  });
+}
+function populateSelects(rows){
+  const medSel=$('#med'); if(medSel && medSel.options.length<=1){
+    const meds=[...new Set(rows.map(r=>pickStr(r,FMAP.doctor)).filter(Boolean))].sort();
+    medSel.innerHTML='<option value="">Médico (todos)</option>'+meds.map(m=>`<option>${m}</option>`).join('');
+  }
+  const covSel=$('#cov'); if(covSel && covSel.options.length<=1){
+    const covs=[...new Set(rows.map(r=>pickStr(r,FMAP.coverage)).filter(Boolean))].sort();
+    covSel.innerHTML='<option value="">Cobertura (todas)</option>'+covs.map(c=>`<option>${c}</option>`).join('');
+  }
+}
+
+/* ========= Carga principal ========= */
+async function load(){
+  const data = await fetchJsonSafe(API.patients(buildServerParamsFromUI()));
+  if (data._error==='non_json'){
+    list.innerHTML = '<div class="p-6 text-center text-red-600">No se pudo cargar /v1/patients/. ¿Sesión expirada?</div>';
+    totalEl.textContent='—'; rangeEl.textContent='0–0'; return;
+  }
+  let results;
+  if (Array.isArray(data)) results = data;
+  else if (Array.isArray(data.results)) results = data.results;
+  else if (Array.isArray(data.data))    results = data.data;
+  else if (Array.isArray(data.items))   results = data.items;
+  else results = [];
+  cachedAll = results;
+
+  let rows = applyFilters(cachedAll); rows = applySort(rows);
+  lastCount = rows.length;
+  const startIndex=(page-1)*pageSize, endIndex=page*pageSize; const slice = rows.slice(startIndex, endIndex);
+  totalEl.textContent = lastCount;
+  list.innerHTML = slice.length ? slice.map((p,i)=> rowTpl(p, startIndex + (i+1))).join('') : `<div class="text-center text-gray-500 p-10">Sin resultados</div>`;
+  const start = slice.length ? startIndex+1 : 0; const end = slice.length ? Math.min(endIndex,lastCount) : 0; rangeEl.textContent = `${start}–${end}`;
+  $('#prev').disabled = !(page>1); $('#next').disabled = !(end<lastCount);
+
+  list.querySelectorAll('.detail').forEach(b=>{ b.onclick = ()=>{ const n = document.getElementById(`detail-${b.dataset.id}`); n.classList.toggle('hidden'); if(!n.classList.contains('hidden')) loadRowAttachments(b.dataset.id); }; });
+  list.querySelectorAll('.attach').forEach(b=>{ b.onclick = ()=>{ const n = document.getElementById(`detail-${b.dataset.id}`); n.classList.remove('hidden'); loadRowAttachments(b.dataset.id); n.scrollIntoView({behavior:'smooth', block:'center'}); } });
+  list.querySelectorAll('.save').forEach(b=>{ b.onclick = ()=> saveRow(b.dataset.id); });
+
+  populateSelects(cachedAll);
+
+  const {start:startM, end:endM} = monthBounds(currentMonth);
+  const monthRows = cachedAll.filter(p=> inRange(pickDateISO(p,FMAP.surgery), startM, endM));
+  renderMiniCalendar(currentMonth, monthRows);
+
+  if(anchorId){ focusRow(anchorId); anchorId=null; }
+}
+
+/* ========= Adjuntos / guardar ========= */
+async function loadRowAttachments(id){
+  const card = document.querySelector(`#attach-${id}`);
+  const data = await fetchJsonSafe(`/v1/patients/${id}/`);
+  const p = data || {};
+  const files = (p.attachments||[]).map(a=>({ kind:(a.kind||a.tipo||a.category||'archivo').toUpperCase(), url: a.external_url || a.url || a.file, name:a.name || (a.kind||'archivo').toUpperCase() })).filter(f=>f.url);
+  if(!files.length){ card.innerHTML = `<div class="text-sm text-gray-500">Sin adjuntos</div>`; return; }
+  card.innerHTML = `<div class="grid md:grid-cols-2 gap-3">${files.map(f=>`<div class="p-3 border rounded-md flex items-center justify-between gap-3"><div class="text-sm font-medium">${f.name}</div><div class="flex gap-2"><button class="px-2 py-1 border rounded-md" onclick="preview('${encodeURI(f.url)}','${f.name.replace(/'/g,"\\'")}')">Vista previa</button><a class="px-2 py-1 border rounded-md" target="_blank" href="${encodeURI(f.url)}">Descargar</a></div></div>`).join('')}</div>`;
+}
+async function uploadAtt(id){
+  const kindSel = document.getElementById(`att-kind-${id}`); const fileInp = document.getElementById(`att-file-${id}`);
+  if(!fileInp.files.length) return;
+  const form = new FormData(); form.append('patient', id); form.append('kind', kindSel.value); form.append('file', fileInp.files[0]);
+  await fetch(`/v1/attachments/`, { method:'POST', body:form, credentials:'include' });
+  await loadRowAttachments(id);
+}
+async function saveRow(id){
+  const estado = document.querySelector(`.estado[data-id="${id}"]`).value;
+  const fecha  = document.querySelector(`.fecha[data-id="${id}"]`).value || null;
+  const body = JSON.stringify({ estado, status: estado, fecha_cx: fecha, fecha_cirugia: fecha });
+  const res = await fetch(`/v1/patients/${id}/`, { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include', body });
+  if(!res.ok){ alert('No se pudo guardar'); return; }
+  await load();
+}
+
+/* ========= Preview ========= */
+async function preview(url, title='Vista previa'){
+  $('#modalTitle').textContent = title; const body = $('#modalBody'); body.innerHTML='';
+  try{
+    const needsAuth = !/^https?:\/\//.test(url) || url.includes('/media/');
+    if(needsAuth){ const r = await fetch(url, {credentials:'include'}); if(!r.ok) throw 0; const blob=await r.blob(); const obj=URL.createObjectURL(blob); renderPreview(obj); }
+    else renderPreview(url);
+  }catch(e){ renderPreview(url); }
+  $('#modal').classList.add('open');
+}
+function renderPreview(u){
+  const body = $('#modalBody');
+  if(/\.(pdf)(\?|$)/i.test(u)){ body.innerHTML = `<embed src="${u}" type="application/pdf" class="w-full h-[80vh]">`; }
+  else if(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(u)){ body.innerHTML = `<img src="${u}" class="max-w-full h-auto mx-auto">`; }
+  else { body.innerHTML = `<div class="p-6 text-center"><a class="underline text-emerald-700" target="_blank" href="${u}">Abrir en pestaña</a></div>`; }
+}
+$('#modalClose').onclick = ()=> $('#modal').classList.remove('open');
+$('#modal').addEventListener('click', e=>{ if(e.target.id==='modal') $('#modal').classList.remove('open'); });
+
+/* ========= Calendario ========= */
+const ws = document.getElementById('workspace'); const wsBody=document.getElementById('wsBody'); const wsHint=document.getElementById('wsHint');
+
+/* NUEVO: nombres de días y etiqueta de mes/año */
+const WEEKDAYS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+function monthLabel(d){ const MES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']; return `${MES[d.getMonth()]} ${d.getFullYear()}`; }
+
+function openWorkspace(tab){ ws.classList.add('open'); if(tab==='stats') renderStatsPage(); else renderCalendarPage(); }
+function closeWorkspace(){ ws.classList.remove('open'); wsBody.innerHTML=''; }
+['openWsCal','openWsCal2'].forEach(id=>{ const b=document.getElementById(id); if(b) b.onclick=()=>openWorkspace('cal'); });
+['openWsStats'].forEach(id=>{ const b=document.getElementById(id); if(b) b.onclick=()=>openWorkspace('stats'); });
+document.getElementById('wsClose').onclick = closeWorkspace;
+document.getElementById('wsTabCal').onclick = ()=> renderCalendarPage();
+document.getElementById('wsTabStats').onclick = ()=> renderStatsPage();
+
+let calMonth = new Date();
+function monthMatrix(date){ const y=date.getFullYear(), m=date.getMonth(); const first=new Date(y,m,1), last=new Date(y,m+1,0); const arr=[]; const off=(first.getDay()+6)%7; for(let i=0;i<off;i++) arr.push(null); for(let d=1; d<=last.getDate(); d++) arr.push(new Date(y,m,d)); return arr; }
+function monthBounds(date){ const y=date.getFullYear(), m=date.getMonth(); const start=new Date(y,m,1).toISOString().slice(0,10); const end=new Date(y,m+1,0).toISOString().slice(0,10); return {start,end}; }
+
+function renderCalendarPage(){
+  wsBody.innerHTML = `
+  <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center gap-3">
+      <div class="text-xl font-semibold">Calendario</div>
+      <div id="calPeriod" class="text-xl text-emerald-800 font-semibold"></div>
+    </div>
+    <div class="flex items-center gap-2">
+      <select id="calSector" class="pill"><option value="">Sector (todos)</option><option value="trauma">Traumatología</option><option value="hemo">Hemodinamia</option></select>
+      <button id="calToday" class="btn">Hoy</button>
+      <button id="calPrev"  class="btn">◀</button>
+      <button id="calNext"  class="btn">▶</button>
+    </div>
+  </div>
+
+  <!-- Cabecera de días -->
+  <div class="grid grid-cols-7 gap-3 text-xs text-gray-500 mb-2">
+    ${WEEKDAYS.map(d=>`<div class="px-2 py-1 text-center">${d}</div>`).join('')}
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="lg:col-span-2"><div id="bigCal" class="calendar-grid"></div></div>
+    <div><div class="card p-3"><div class="text-sm font-semibold mb-2">Turnos del día <span id="selDay">—</span></div><div id="dayList" class="space-y-2 max-h-[72vh] overflow-auto"></div></div></div>
+  </div>`;
+  $('#calToday').onclick = ()=>{ calMonth=new Date(); drawBigCalendar(); };
+  $('#calPrev').onclick  = ()=>{ calMonth=new Date(calMonth.getFullYear(), calMonth.getMonth()-1, 1); drawBigCalendar(); };
+  $('#calNext').onclick  = ()=>{ calMonth=new Date(calMonth.getFullYear(), calMonth.getMonth()+1, 1); drawBigCalendar(); };
+  drawBigCalendar();
+}
+function renderMiniCalendar(date, rows){
+  const box = document.getElementById('miniCalendar'); if(!box) return; box.innerHTML='';
+  const days = monthMatrix(date); const map={};
+  (rows||[]).forEach(p=>{ const d=surgeryDate(p); if(!d) return; map[d]=(map[d]||0)+1; });
+  days.forEach(d=>{
+    const el=document.createElement('div'); el.className='mini-day';
+    if(!d){ el.style.visibility='hidden'; box.appendChild(el); return; }
+    const key=d.toISOString().slice(0,10); const cnt=map[key]||0;
+    el.innerHTML = `<div class="text-xs text-gray-500 flex justify-between"><span>${d.getDate()}</span><span>${cnt? cnt+'🗓':''}</span></div>`;
+    el.onclick=()=>{ document.getElementById('fx1').value=key; document.getElementById('fx2').value=key; page=1; load(); };
+    box.appendChild(el);
+  });
+}
+async function drawBigCalendar(){
+  wsHint.textContent='Clickeá un día para ver sus turnos.';
+  const per = document.getElementById('calPeriod'); if (per) per.textContent = monthLabel(calMonth);
+
+  const {start,end}=monthBounds(calMonth);
+  const rows = cachedAll.filter(p =>
+    inRange(surgeryDate(p), start, end) &&
+    (!$('#calSector').value || sectorMatchesFilter(p, $('#calSector').value))
+  );
+  const big=document.getElementById('bigCal'); big.innerHTML='';
+  const days=monthMatrix(calMonth); const map={};
+  rows.forEach(p=>{ const k=surgeryDate(p); if(k) (map[k]||(map[k]=[])).push(p); });
+  days.forEach(d=>{
+    const cell=document.createElement('div'); cell.className='calendar-day';
+    if(!d){ cell.style.visibility='hidden'; big.appendChild(cell); return; }
+    const k=d.toISOString().slice(0,10); const items=map[k]||[];
+    const wd = WEEKDAYS[(d.getDay()+6)%7]; // lunes=0
+    cell.innerHTML = `<div class="flex items-center justify-between">
+        <div class="text-sm font-medium text-gray-700">${d.getDate()} <span class="text-xs text-gray-400">(${wd})</span></div>
+        <div class="text-xs text-gray-500">${items.length} turno(s)</div>
+      </div>
+      <div class="mt-1">
+        ${items.slice(0,6).map(p=>{
+          const code = sectorCodeSafe(p);
+          return `<div class="item ${code==='hemo'?'it-hemo':'it-trauma'}">${(pickStr(p,FMAP.name)||'pte')}</div>`;
+        }).join('')}
+      </div>`;
+    cell.onclick=()=> showDayList(k, items);
+    big.appendChild(cell);
+  });
+  const todayKey=new Date().toISOString().slice(0,10);
+  if(map[todayKey]) showDayList(todayKey,map[todayKey]);
+  else { $('#selDay').textContent='—'; $('#dayList').innerHTML='<div class="text-sm text-gray-500">Elegí un día</div>'; }
+}
+function showDayList(key, items){
+  $('#selDay').textContent = key.split('-').reverse().join('/');
+  const box=$('#dayList'); if(!items.length){ box.innerHTML='<div class="text-sm text-gray-500">Sin turnos</div>'; return; }
+  box.innerHTML = items.map((p)=>{
+    const pid=pick(p,FMAP.id);
+    return `<div class="p-2 border rounded-md bg-white flex items-center justify-between">
+      <div><div class="font-medium">${pickStr(p,FMAP.name)||'-'}</div><div class="text-xs text-gray-500">${pickStr(p,FMAP.coverage)||''} · ${pickStr(p,FMAP.doctor)||''}</div></div>
+      <div class="flex items-center gap-2">
+        <button class="px-2 py-1 border rounded-md"
+          onclick="document.getElementById('fx1').value='${key}';document.getElementById('fx2').value='${key}';document.getElementById('workspace').classList.remove('open');window.anchorId='${pid}';page=1;load();">Ver en tabla</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ========= Estadísticas (pro) ========= */
+function groupCount(rows, keyFn){ const map = new Map(); for (const r of rows){ const k = keyFn(r); if (!k) continue; map.set(k, (map.get(k) || 0) + 1); } return map; }
+function formatMonth(iso){ return iso ? iso.slice(0,7) : ''; }
+function formatWeek(iso){
+  if (!iso) return '';
+  const d = new Date(iso);
+  const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (dt.getUTCDay() + 6) % 7;
+  dt.setUTCDate(dt.getUTCDate() - dayNum + 3);
+  const firstThursday = new Date(Date.UTC(dt.getUTCFullYear(),0,4));
+  const week = 1 + Math.round(((dt - firstThursday)/86400000 - 3 + (firstThursday.getUTCDay()+6)%7)/7);
+  return `${dt.getUTCFullYear()}-W${String(week).padStart(2,'0')}`;
+}
+function cumulate(arr){ let s = 0; return arr.map(v => (s += v)); }
+
+function renderStatsPage(){
+  wsBody.innerHTML = `
+  <div class="flex items-center justify-between mb-3">
+    <div class="text-xl font-semibold">Estadísticas</div>
+    <div class="flex items-center gap-2 text-sm text-gray-600">Toman los filtros del panel + estos propios</div>
+  </div>
+
+  <div class="card p-4 space-y-3">
+    <div class="grid md:grid-cols-3 sm:grid-cols-2 grid-cols-1 gap-2">
+      <div>
+        <label class="text-xs text-gray-500">Tipo de gráfico</label>
+        <select id="stType" class="pill w-full">
+          <option value="bar">Barras</option>
+          <option value="stacked">Barras apiladas</option>
+          <option value="line">Línea</option>
+          <option value="pie">Torta</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500">Agrupar por</label>
+        <select id="stGroup" class="pill w-full">
+          <option value="estado">Estado</option>
+          <option value="cobertura">Cobertura</option>
+          <option value="medico">Médico</option>
+          <option value="sector">Sector</option>
+          <option value="fc-dia">Fecha Carga · Día</option>
+          <option value="fc-semana">Fecha Carga · Semana</option>
+          <option value="fc-mes">Fecha Carga · Mes</option>
+          <option value="fx-dia">Fecha Cirugía · Día</option>
+          <option value="fx-semana">Fecha Cirugía · Semana</option>
+          <option value="fx-mes">Fecha Cirugía · Mes</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500">Acumulado</label>
+        <select id="stAccum" class="pill w-full">
+          <option value="no">No</option>
+          <option value="si">Sí (línea/barras)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-4 sm:grid-cols-2 grid-cols-1 gap-2">
+      <div class="text-xs text-gray-500">Rango Fecha de carga</div>
+      <input id="stFc1" type="date" class="pill"/>
+      <input id="stFc2" type="date" class="pill"/>
+      <div></div>
+      <div class="text-xs text-gray-500">Rango Fecha de cirugía</div>
+      <input id="stFx1" type="date" class="pill"/>
+      <input id="stFx2" type="date" class="pill"/>
+      <div></div>
+    </div>
+
+    <div class="flex gap-2">
+      <button id="stApply" class="btn btn-primary">Aplicar</button>
+      <button id="stReset" class="btn">Limpiar stats</button>
+      <div class="text-sm text-gray-500 ml-auto" id="stInfo"></div>
+    </div>
+
+    <div class="h-[520px]"><canvas id="stCanvas"></canvas></div>
+  </div>`;
+  document.getElementById('stApply').onclick = runStats;
+  document.getElementById('stReset').onclick = ()=>{
+    ['stFc1','stFc2','stFx1','stFx2'].forEach(id=>document.getElementById(id).value='');
+    runStats();
+  };
+  runStats();
+}
+
+function runStats(){
+  wsHint.textContent='Generando...';
+  let base = applyFilters(cachedAll); // respeta filtros del panel
+
+  // rangos propios
+  const fc1 = $('#stFc1')?.value || ''; const fc2 = $('#stFc2')?.value || '';
+  const fx1 = $('#stFx1')?.value || ''; const fx2 = $('#stFx2')?.value || '';
+  if (fc1 || fc2) base = base.filter(p => inRange(createdDate(p), fc1, fc2));
+  if (fx1 || fx2) base = base.filter(p => inRange(surgeryDate(p), fx1, fx2));
+
+  const type  = $('#stType')?.value || 'bar';
+  const group = $('#stGroup')?.value || 'estado';
+  const accum = $('#stAccum')?.value === 'si';
+
+  // agrupación
+  let map;
+  const getSector = (p)=> sectorCodeSafe(p) === 'hemo' ? 'Hemo' : 'Trauma';
+  switch(group){
+    case 'estado':    map = groupCount(base, p => pickStr(p, FMAP.status)   || '—'); break;
+    case 'cobertura': map = groupCount(base, p => pickStr(p, FMAP.coverage) || '—'); break;
+    case 'medico':    map = groupCount(base, p => pickStr(p, FMAP.doctor)   || '—'); break;
+    case 'sector':    map = groupCount(base, getSector); break;
+    case 'fc-dia':    map = groupCount(base, p => createdDate(p)); break;
+    case 'fc-semana': map = groupCount(base, p => formatWeek(createdDate(p))); break;
+    case 'fc-mes':    map = groupCount(base, p => formatMonth(createdDate(p))); break;
+    case 'fx-dia':    map = groupCount(base, p => surgeryDate(p)); break;
+    case 'fx-semana': map = groupCount(base, p => formatWeek(surgeryDate(p))); break;
+    case 'fx-mes':    map = groupCount(base, p => formatMonth(surgeryDate(p))); break;
+    default:          map = new Map();
+  }
+
+  let labels = Array.from(map.keys()).filter(Boolean).sort();
+  let values = labels.map(k => map.get(k) || 0);
+  if (accum && (type==='line' || type==='bar' || type==='stacked')) values = cumulate(values);
+
+  const ctx=document.getElementById('stCanvas');
+  if (statChart) statChart.destroy();
+
+  if (type === 'pie') {
+    statChart = new Chart(ctx, { type:'pie', data:{labels, datasets:[{data:values}]}, options:{responsive:true, maintainAspectRatio:false} });
+  } else if (type === 'stacked') {
+    const canStack = ['estado','cobertura','medico'].includes(group);
+    if (!canStack) {
+      statChart = new Chart(ctx, { type:'bar', data:{labels, datasets:[{label:'Casos', data:values}]}, options:{responsive:true, maintainAspectRatio:false} });
+    } else {
+      const traumaVals = labels.map(label => base.filter(p => {
+        let k; if (group==='estado') k=pickStr(p,FMAP.status)||'—';
+        if (group==='cobertura') k=pickStr(p,FMAP.coverage)||'—';
+        if (group==='medico') k=pickStr(p,FMAP.doctor)||'—';
+        return k===label && sectorCodeSafe(p)!=='hemo';
+      }).length);
+      const hemoVals = labels.map(label => base.filter(p => {
+        let k; if (group==='estado') k=pickStr(p,FMAP.status)||'—';
+        if (group==='cobertura') k=pickStr(p,FMAP.coverage)||'—';
+        if (group==='medico') k=pickStr(p,FMAP.doctor)||'—';
+        return k===label && sectorCodeSafe(p)==='hemo';
+      }).length);
+      statChart = new Chart(ctx, {
+        type:'bar',
+        data:{ labels, datasets:[
+          {label:'Trauma', data: accum? cumulate(traumaVals):traumaVals, stack:'s1'},
+          {label:'Hemo',   data: accum? cumulate(hemoVals)  :hemoVals,   stack:'s1'},
+        ]},
+        options:{ responsive:true, maintainAspectRatio:false, scales:{x:{stacked:true}, y:{stacked:true}} }
+      });
+    }
+  } else {
+    statChart = new Chart(ctx, { type, data:{labels, datasets:[{label:'Casos', data:values}]}, options:{responsive:true, maintainAspectRatio:false} });
+  }
+
+  wsHint.textContent = `${base.length} registros (post-filtro)`;
+  const stInfo = document.getElementById('stInfo'); if (stInfo) stInfo.textContent = `${labels.length} categorías`;
+}
+
+/* ========= Eventos ========= */
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+['q'].forEach(id=> document.getElementById(id).addEventListener('input', debounce(()=>{ page=1; load(); }, 250)));
+['cov','med','est','sec','fc1','fc2','fx1','fx2','sortBy','sortDir'].forEach(id=> document.getElementById(id).addEventListener('change', ()=>{ page=1; load(); }));
+
+$('#btnRefresh').onclick = ()=>{ page=1; load(); };
+$('#btnClear').onclick   = ()=>{ ['q','cov','med','est','sec','fc1','fc2','fx1','fx2'].forEach(id=>document.getElementById(id).value=''); page=1; load(); };
+$('#prev').onclick       = ()=>{ if(page>1){page--; load();} };
+$('#next').onclick       = ()=>{ if((page*pageSize) < lastCount){ page++; load(); } };
+
+/* ========= Exportar ========= */
+$('#btnExport').onclick = async()=>{
+  const rows = applyFilters(cachedAll);
+  const out = rows.map(p=>({
+    id:pick(p,FMAP.id), nombre:pickStr(p,FMAP.name), dni:pickStr(p,FMAP.dni),
+    sector:(sectorCodeSafe(p)||''), fecha_cx:surgeryDate(p)||'', estado:pickStr(p,FMAP.status)||'',
+    email:pickStr(p,['email','mail'])||'', telefono:pickStr(p,['telefono','phone','tel'])||'',
+    cobertura:pickStr(p,FMAP.coverage)||'', medico:pickStr(p,FMAP.doctor)||''
+  }));
+  const wb=XLSX.utils.book_new(); const ws=XLSX.utils.json_to_sheet(out);
+  XLSX.utils.book_append_sheet(wb, ws, 'Pacientes'); XLSX.writeFile(wb, 'autorizaciones.xlsx');
+};
+
+/* ========= Password ========= */
+const PASSWORD_CHANGE_URL = '/accounts/password_change/';  // ruta nativa Django auth
+document.getElementById('btnPwd').onclick = ()=> window.open(PASSWORD_CHANGE_URL, '_blank');
+
+/* ========= Init ========= */
+applyGrid();
+load();
+</script>
+</body>
+</html>

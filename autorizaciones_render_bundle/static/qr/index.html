@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>CEMIC · Oficina Virtual de Autorizaciones</title>
+  <style>
+    :root{--verde:#064427;--gris:#f5f7f6;}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--gris);font-family:Arial,system-ui,sans-serif}
+    .wrap{max-width:760px;margin:28px auto;padding:0 16px}
+    .card{background:#fff;border-radius:16px;box-shadow:0 10px 28px rgba(0,0,0,.08);overflow:hidden}
+    .head{background:var(--verde);color:#fff;padding:20px 24px}
+    .head h1{margin:0;font-size:22px}
+    .body{padding:22px 24px}
+    label{font-weight:700;font-size:14px;margin:12px 0 6px;display:block}
+    input,textarea,select{width:100%;border:1px solid #d6ddd9;padding:12px;border-radius:10px;font-size:15px}
+    textarea{min-height:110px;resize:vertical}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:720px){.row{grid-template-columns:1fr}}
+    .note{font-size:12px;color:#4a5a54;margin-top:8px}
+    .btn{background:var(--verde);color:#fff;border:0;padding:14px;border-radius:12px;width:100%;font-weight:700;cursor:pointer;margin-top:16px}
+    .btn[disabled]{opacity:.7;cursor:not-allowed}
+    .wpp{position:fixed;right:18px;bottom:18px;background:#25D366;color:#fff;padding:12px 14px;border-radius:999px;text-decoration:none;font-weight:700;box-shadow:0 8px 18px rgba(0,0,0,.18)}
+    .help{font-size:12px;color:#50615b;margin-top:6px}
+    .hint{font-size:12px;color:#4a5a54;margin-top:6px}
+    .ok{background:#e7f8ef;border:1px solid #c7eedc;color:#0a6a44;padding:10px;border-radius:10px;margin-top:8px;display:none}
+    .err{background:#fde8e8;border:1px solid #f8bbbb;color:#7a241d;padding:10px;border-radius:10px;margin-top:8px;display:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="head"><h1>CEMIC · Oficina Virtual de Autorizaciones</h1></div>
+      <div class="body">
+        <form id="form" novalidate>
+          <div class="row">
+            <div>
+              <label>Nombre y apellido *</label>
+              <input name="nombre" required placeholder="Ej: Juan Pérez">
+            </div>
+            <div>
+              <label>DNI *</label>
+              <input name="dni" required inputmode="numeric" placeholder="Ej: 12345678">
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Correo electrónico *</label>
+              <input type="email" name="email" required placeholder="paciente@mail.com">
+            </div>
+            <div>
+              <label>Teléfono *</label>
+              <input name="telefono" required inputmode="tel" placeholder="11 5555-5555">
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Cobertura médica *</label>
+              <input list="obrasList" name="cobertura" id="cobertura" required placeholder="Escribí para buscar o ingresá manualmente">
+              <datalist id="obrasList"></datalist>
+              <div class="help">Escribí para buscar. Si no aparece, ingresá el nombre tal como figura en tu credencial.</div>
+            </div>
+            <div>
+              <label>Médico tratante *</label>
+              <input list="medicosList" name="medico" id="medico" required placeholder="Escribí para buscar o ingresá manualmente">
+              <datalist id="medicosList"></datalist>
+              <div class="help">Escribí parte del apellido/nombre para filtrar. Si no figura, ingresalo manualmente.</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Sector *</label>
+              <select name="sector_code" required>
+                <option value="">Elegí…</option>
+                <option value="trauma">Traumatología</option>
+                <option value="hemo">Hemodinamia</option>
+              </select>
+            </div>
+            <div>
+              <label for="fecha_cx">Fecha de intervención (opcional)</label>
+              <input id="fecha_cx" name="fecha_cx" type="date" />
+            </div>
+          </div>
+
+          <label>Foto de orden médica *</label>
+          <input type="file" name="orden_medica" accept="image/*,application/pdf" required>
+
+          <label>Foto de DNI *</label>
+          <input type="file" name="dni_file" accept="image/*,application/pdf" required>
+
+          <label>Foto de credencial *</label>
+          <input type="file" name="credencial" accept="image/*,application/pdf" required>
+
+          <label for="orden_materiales">Orden de pedido de materiales (opcional)</label>
+          <input id="orden_materiales" name="orden_materiales" type="file" accept=".jpg,.jpeg,.png,.pdf" />
+          <div class="hint">Podés subir JPG, PNG o PDF. Máx. 15 MB por archivo.</div>
+
+          <label>Observaciones</label>
+          <textarea name="observaciones" placeholder="Comentarios adicionales"></textarea>
+
+          <button class="btn" id="sendBtn" type="submit">Enviar solicitud</button>
+          <div id="ok" class="ok">Solicitud enviada. Redirigiendo…</div>
+          <div id="err" class="err">No se pudo enviar. Revisá los campos e intentá nuevamente.</div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <a class="wpp" href="https://wa.me/5491155922359" target="_blank" rel="noopener">WhatsApp</a>
+
+  <script>
+    const BASE = '';
+    const MAX = 15 * 1024 * 1024;
+
+    const MEDICOS = ["ABALO EDUARDO","ADROGUE LUIS","BARBIERI PABLO","CARRIZO JUAN","CHAVEZ ARIEL","CONSTANZA EDUARDO",
+      "CORDOBA ALEJANDRA","DE ZAVALIA MAXIMO","DEIMUNDO MARCOS","DEVOTO MATIAS","GOBBI ENRIQUE","GRANDOLI FERNANDO",
+      "IGLESIAS ALEJANDRO","MALLEA ANDRES","MENINATO MARCOS","MOUNIER CARLOS","ORTIZ EZEQUIEL","PEREA AGUSTIN",
+      "PINOTTI NORBERTO","SANNA HERNAN","SERE IGNACIO","TORGA SPAK ROGER","VALENTINI ROBERTO","VILLA NATALIA",
+      "YAVEN IGNACIO","YEREGUI SANTIAGO"].sort((a,b)=>a.localeCompare(b));
+
+    const OBRAS = ["ACMED S.A","AMEPBA","ANDAR","APRES S.A.","APSOT","ASOC.MEDICA DEL DPTO. CASTELLANOS",
+      "ASOCIACION MUTUAL RURALISTA","ASOCIACION MUTUAL SANCOR SALUD","ASOCIART S.A.(ART)","AVALIAN","OMINT","OSDE",
+      "SWISS MEDICAL","GALENO","MEDIFE","MEDICUS","PARTICULAR"].sort((a,b)=>a.localeCompare(b));
+
+    function fillLists(){
+      const dlMed = document.getElementById('medicosList');
+      const dlObr = document.getElementById('obrasList');
+      MEDICOS.forEach(v=>{ const o=document.createElement('option'); o.value=v; dlMed.appendChild(o); });
+      OBRAS.forEach(v=>{ const o=document.createElement('option'); o.value=v; dlObr.appendChild(o); });
+    }
+
+    async function createPatient(payload){
+      const r = await fetch(BASE + '/v1/patients/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if(!r.ok) throw new Error('Error creando paciente');
+      return await r.json();
+    }
+
+    async function uploadAttachment(patientId, kind, file){
+      const fd = new FormData();
+      fd.append('patient', patientId);
+      fd.append('kind', kind);
+      fd.append('file', file);
+      const r = await fetch(BASE + '/v1/attachments/', { method: 'POST', body: fd });
+      if(!r.ok) throw new Error('Error subiendo ' + kind);
+      return await r.json();
+    }
+
+    function validateFiles(files){
+      for (const f of files){ if (f && f.size > MAX) return false; }
+      return true;
+    }
+
+    window.addEventListener('load', () => {
+      fillLists();
+      const form = document.getElementById('form');
+      const ok = document.getElementById('ok');
+      const err = document.getElementById('err');
+      const btn = document.getElementById('sendBtn');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        err.style.display='none'; ok.style.display='none';
+
+        const f1=form.orden_medica.files[0], f2=form.dni_file.files[0], f3=form.credencial.files[0], f4=form.orden_materiales.files[0];
+        if(!f1||!f2||!f3){ err.textContent='Adjuntá la orden médica, DNI y credencial.'; err.style.display='block'; return; }
+        if(!validateFiles([f1,f2,f3,f4])){ err.textContent='Cada archivo debe pesar hasta 15 MB.'; err.style.display='block'; return; }
+
+        const payload = {
+          nombre: form.nombre.value.trim(),
+          dni: form.dni.value.trim(),
+          email: form.email.value.trim(),
+          telefono: form.telefono.value.trim(),
+          cobertura: form.cobertura.value.trim(),
+          medico: form.medico.value.trim(),
+          observaciones: form.observaciones.value.trim(),
+          fecha_cx: form.fecha_cx.value || null,
+          sector_code: form.sector_code.value
+        };
+
+        btn.disabled=true; btn.textContent='Enviando…';
+        try{
+          const patient = await createPatient(payload);
+          const id = patient.id;
+          await uploadAttachment(id, 'orden', f1);
+          await uploadAttachment(id, 'dni', f2);
+          await uploadAttachment(id, 'credencial', f3);
+          if (f4) await uploadAttachment(id, 'materiales', f4);
+          ok.style.display='block';
+          setTimeout(()=>{ window.location.href = './gracias.html'; }, 700);
+        }catch(e){
+          console.error(e);
+          err.textContent = 'No se pudo enviar (' + (e.message||e) + ')';
+          err.style.display='block';
+        }finally{
+          btn.disabled=false; btn.textContent='Enviar solicitud';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
