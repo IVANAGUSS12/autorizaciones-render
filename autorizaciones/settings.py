@@ -2,14 +2,30 @@ import os
 from pathlib import Path
 import dj_database_url
 
+# --- Paths ---
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# --- Básicos ---
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "unsafe-secret-key")
-DEBUG = os.environ.get("DEBUG", "False") == "True"
+DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", ".onrender.com,localhost,127.0.0.1").split(",") if h.strip()]
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "https://*.onrender.com").split(",") if o.strip()]
+def _split_env(name: str, default: str):
+    raw = os.environ.get(name, default)
+    return [x.strip() for x in raw.split(",") if x.strip()]
 
+# Dominio por defecto para DigitalOcean + local
+ALLOWED_HOSTS = _split_env(
+    "ALLOWED_HOSTS",
+    ".ondigitalocean.app,localhost,127.0.0.1"
+)
+
+# CSRF: DO usa HTTPS
+CSRF_TRUSTED_ORIGINS = _split_env(
+    "CSRF_TRUSTED_ORIGINS",
+    "https://*.ondigitalocean.app"
+)
+
+# --- Apps ---
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -17,14 +33,17 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+
     "rest_framework",
     "corsheaders",
+
     "core",
 ]
 
+# --- Middlewares ---
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # static en prod
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -54,14 +73,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "autorizaciones.wsgi.application"
 
+# --- Base de datos ---
 DATABASES = {
     "default": dj_database_url.parse(
         os.environ.get("DATABASE_URL", "postgres://user:pass@localhost:5432/dbname"),
         conn_max_age=600,
-        ssl_require=not DEBUG,
+        ssl_require=not DEBUG,  # SSL en prod
     )
 }
 
+# --- Passwords ---
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 10}},
@@ -69,21 +90,32 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# --- Locale ---
 LANGUAGE_CODE = "es-ar"
 TIME_ZONE = "America/Argentina/Buenos_Aires"
 USE_I18N = True
 USE_TZ = True
 
+# --- Static ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-WHITENOISE_MAX_AGE = 60*60*24*30
+# WhiteNoise: sirve assets comprimidos y con hash
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    }
+}
+WHITENOISE_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))
+# --- Media (uploads) ---
+MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
+MEDIA_ROOT = os.environ.get("MEDIA_ROOT", "/data/media")
 
+# --- Django defaults ---
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# --- Seguridad (razonable para prod) ---
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
@@ -94,20 +126,36 @@ SECURE_HSTS_PRELOAD = not DEBUG
 X_FRAME_OPTIONS = "DENY"
 REFERRER_POLICY = "same-origin"
 
+# --- DRF ---
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticatedOrReadOnly"
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
 }
 
-CORS_ALLOWED_ORIGINS = []
+# --- CORS ---
+# Definilo por env: CORS_ALLOWED_ORIGINS="https://tudominio,https://sub.tu.com"
+CORS_ALLOWED_ORIGINS = _split_env("CORS_ALLOWED_ORIGINS", "")
 CORS_ALLOW_CREDENTIALS = True
 
+# --- Auth redirects ---
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/panel/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
+
+# --- Subidas grandes (opcional) ---
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("DATA_UPLOAD_MAX_MEMORY_SIZE", 20 * 1024 * 1024))  # 20 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_UPLOAD_MAX_MEMORY_SIZE", 20 * 1024 * 1024))
+
+# --- Logging básico para ver 500 en prod ---
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "INFO"},
+}
