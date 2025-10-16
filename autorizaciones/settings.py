@@ -39,9 +39,9 @@ INSTALLED_APPS = [
     # Terceros
     "rest_framework",
     "corsheaders",
-    "storages",               # <— para S3/Spaces
+    "storages",
 
-    # Tu app
+    # App
     "core",
 ]
 
@@ -50,7 +50,7 @@ INSTALLED_APPS = [
 # ---------------------------------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",   # <— static en producción
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -81,7 +81,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "autorizaciones.wsgi.application"
 
 # ---------------------------------------------------------
-# DATABASE (usa DATABASE_URL del entorno)
+# DATABASE
 # ---------------------------------------------------------
 DATABASES = {
     "default": dj_database_url.config(
@@ -110,17 +110,13 @@ USE_TZ = True
 
 # ---------------------------------------------------------
 # STATIC / MEDIA
-#   - STATIC: Whitenoise (local en el contenedor)
-#   - MEDIA: DO Spaces (S3) si USE_S3=True; si no, filesystem
 # ---------------------------------------------------------
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 WHITENOISE_MAX_AGE = 60 * 60 * 24 * 30
 STORAGES = {
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
-    }
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}
 }
 
 USE_S3 = os.getenv("USE_S3", "True") == "True"
@@ -130,8 +126,8 @@ if USE_S3:
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
     SPACES_NAME = os.getenv("SPACES_NAME")
     SPACES_REGION = os.getenv("SPACES_REGION")
-    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")  # p.ej. https://sfo3.digitaloceanspaces.com
-    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")  # p.ej. autorizaciones.sfo3.digitaloceanspaces.com
+    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")  # https://sfo3.digitaloceanspaces.com
+    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")  # ejemplo: autorizaciones.sfo3.digitaloceanspaces.com
 
     if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SPACES_NAME, SPACES_ENDPOINT, AWS_S3_CUSTOM_DOMAIN]):
         raise RuntimeError("Faltan variables de entorno para S3/Spaces.")
@@ -140,7 +136,12 @@ if USE_S3:
     AWS_S3_ENDPOINT_URL = SPACES_ENDPOINT
     AWS_STORAGE_BUCKET_NAME = SPACES_NAME
 
-    # Ruta pública para servir los adjuntos
+    # Recomendados para links públicos y nombres únicos
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_DEFAULT_ACL = None
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_QUERYSTRING_AUTH = False  # URLs limpias, sin firmas expiring
+
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
 else:
     MEDIA_URL = "/media/"
@@ -165,6 +166,8 @@ REFERRER_POLICY = "same-origin"
 # DRF / CORS
 # ---------------------------------------------------------
 REST_FRAMEWORK = {
+    # Dejamos SessionAuthentication por defecto para panel/admin,
+    # pero en las vistas públicas vamos a EXENTAR CSRF solo en create.
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],
@@ -175,7 +178,7 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 50,
 }
 
-CORS_ALLOWED_ORIGINS = []
+CORS_ALLOWED_ORIGINS = []  # mismo origen; si usás dominio distinto para el formulario, agregalo aquí
 CORS_ALLOW_CREDENTIALS = True
 
 # ---------------------------------------------------------
