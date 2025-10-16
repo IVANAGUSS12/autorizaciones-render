@@ -15,12 +15,13 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('v1/', include(router.urls)),
     path('accounts/', include('django.contrib.auth.urls')),
+
     path('', TemplateView.as_view(template_name='public/index.html'), name='public_form'),
     path('gracias.html', TemplateView.as_view(template_name='public/gracias.html'), name='gracias'),
     path('panel/', TemplateView.as_view(template_name='panel/index.html'), name='panel_index'),
 ]
 
-# ---------- FIX: servir archivos subidos ----------
+# servir MEDIA también en producción (rápido/práctico para DO)
 urlpatterns += [
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
