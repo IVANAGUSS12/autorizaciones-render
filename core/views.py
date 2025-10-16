@@ -3,6 +3,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Patient, Attachment
 from .serializers import PatientSerializer, AttachmentSerializer
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all().order_by("-created_at")
@@ -15,6 +17,7 @@ class PatientViewSet(viewsets.ModelViewSet):
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
 
+
 class AttachmentViewSet(viewsets.ModelViewSet):
     queryset = Attachment.objects.select_related("patient").order_by("-created_at")
     serializer_class = AttachmentSerializer
@@ -24,7 +27,11 @@ class AttachmentViewSet(viewsets.ModelViewSet):
         if self.action in ["create"]:
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
-# core/views.py (añadir al final)
 
-    def health(request):
+
+# ---------------------------------------------------------
+# Endpoint de salud (para DigitalOcean Health Check)
+# ---------------------------------------------------------
+@csrf_exempt
+def health(request):
     return JsonResponse({"status": "ok"})
