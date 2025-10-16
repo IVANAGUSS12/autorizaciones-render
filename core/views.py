@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import Patient, Attachment
 from .serializers import PatientSerializer, AttachmentSerializer
 
-# ---- Auth helper: exentar CSRF solo cuando lo indiquemos ----
+# --- Auth helper: exentar CSRF solo cuando lo indiquemos ---
 class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
         return  # desactiva verificación CSRF
@@ -45,7 +45,7 @@ class AttachmentViewSet(viewsets.ModelViewSet):
         return [SessionAuthentication()]
 
 # ---------------------------------------------------------
-# Health check
+# Health check para DigitalOcean
 # ---------------------------------------------------------
 @csrf_exempt
 def health(request):
@@ -73,3 +73,4 @@ def storage_diag(request):
     except Exception as e:
         tb = traceback.format_exc()
         return JsonResponse({"ok": False, "error": str(e), "traceback": tb}, status=500)
+
