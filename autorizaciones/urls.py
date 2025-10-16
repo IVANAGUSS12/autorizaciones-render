@@ -1,3 +1,4 @@
+# autorizaciones/urls.py
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -8,6 +9,5 @@ urlpatterns = [
     path("", include("core.urls")),
 ]
 
-# Para entorno con MEDIA local (volumen)
 if not getattr(settings, "USE_S3", False):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
