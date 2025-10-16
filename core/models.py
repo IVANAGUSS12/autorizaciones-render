@@ -1,7 +1,6 @@
 from django.db import models
 from django.utils import timezone
-import os
-import uuid
+import os, uuid
 
 SECTOR_CHOICES = (
     ("trauma", "Traumatología"),
@@ -32,22 +31,20 @@ class Patient(models.Model):
     def __str__(self):
         return f"{self.nombre} ({self.dni})"
 
-
 def attachment_upload_to(instance, filename):
-    base, ext = os.path.splitext(filename)
-    ext = (ext or "").lower()
+    ext = os.path.splitext(filename)[1]
     pid = instance.patient_id or "tmp"
     today = timezone.now().strftime("%Y/%m/%d")
     return f"adjuntos/{pid}/{today}/{uuid.uuid4().hex}{ext}"
 
 class Attachment(models.Model):
-    KIND_CHOICES = (
+    KIND_CHOICES = [
         ("orden", "orden"),
         ("dni", "dni"),
         ("credencial", "credencial"),
         ("materiales", "materiales"),
         ("otro", "otro"),
-    )
+    ]
     patient = models.ForeignKey(Patient, related_name="attachments", on_delete=models.CASCADE)
     kind = models.CharField(max_length=20, choices=KIND_CHOICES, default="otro")
     file = models.FileField(upload_to=attachment_upload_to)
@@ -55,7 +52,7 @@ class Attachment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
-        if not self.name and self.file and hasattr(self.file, "name"):
+        if not self.name and self.file:
             self.name = os.path.basename(self.file.name)
         super().save(*args, **kwargs)
 
@@ -65,7 +62,4 @@ class Attachment(models.Model):
             return self.file.url
         except Exception:
             return ""
-
-    def __str__(self):
-        return f"{self.patient} - {self.kind} - {self.name or os.path.basename(self.file.name)}"
 
