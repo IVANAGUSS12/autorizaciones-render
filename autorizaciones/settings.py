@@ -125,23 +125,23 @@ if USE_S3:
     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
     SPACES_NAME = os.getenv("SPACES_NAME")
-    SPACES_REGION = os.getenv("SPACES_REGION")
-    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")  # p.ej. https://sfo3.digitaloceanspaces.com
-    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")  # p.ej. autorizaciones.sfo3.digitaloceanspaces.com
+    SPACES_REGION = os.getenv("SPACES_REGION")                 # ej: sfo3
+    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")             # ej: https://sfo3.digitaloceanspaces.com  (SIN barra final)
+    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")   # ej: autorizaciones.sfo3.digitaloceanspaces.com
 
-    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SPACES_NAME, SPACES_ENDPOINT, AWS_S3_CUSTOM_DOMAIN]):
+    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SPACES_NAME, SPACES_REGION, SPACES_ENDPOINT, AWS_S3_CUSTOM_DOMAIN]):
         raise RuntimeError("Faltan variables de entorno para S3/Spaces.")
 
-    # Media en Spaces
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
     AWS_STORAGE_BUCKET_NAME = SPACES_NAME
     AWS_S3_ENDPOINT_URL = SPACES_ENDPOINT
     AWS_S3_REGION_NAME = SPACES_REGION
     AWS_S3_SIGNATURE_VERSION = "s3v4"
-    AWS_S3_ADDRESSING_STYLE = "virtual"
+    AWS_S3_ADDRESSING_STYLE = "virtual"  # si falla, probar "path"
     AWS_DEFAULT_ACL = None
     AWS_S3_FILE_OVERWRITE = False
-    AWS_QUERYSTRING_AUTH = False  # URLs públicas limpias
+    AWS_QUERYSTRING_AUTH = False         # URLs públicas limpias
+
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
 else:
     MEDIA_URL = "/media/"
@@ -166,8 +166,8 @@ REFERRER_POLICY = "same-origin"
 # DRF / CORS
 # =========================
 REST_FRAMEWORK = {
+    # mantenemos SessionAuth; en vistas públicas se exenta CSRF solo en create (ver views.py)
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        # Mantener SessionAuth para admin/panel; exentamos CSRF sólo en create (ver views.py)
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -186,3 +186,4 @@ CORS_ALLOW_CREDENTIALS = True
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/panel/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
+
