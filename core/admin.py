@@ -3,15 +3,12 @@ from .models import Patient, Attachment
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ("id", "nombre", "dni", "cobertura", "medico", "sector_code", "estado", "fecha_cx", "created_at")
-    list_filter = ("sector_code", "estado", "cobertura", "medico")
-    search_fields = ("nombre", "dni", "cobertura", "medico")
-    list_per_page = 50
+    list_display = ("id","nombre","dni","cobertura","medico","sector_code","estado","fecha_cx","created_at")
+    list_filter = ("sector_code","estado","cobertura","medico")
+    search_fields = ("nombre","dni","cobertura","medico")
 
 @admin.register(Attachment)
 class AttachmentAdmin(admin.ModelAdmin):
-    list_display = ("id", "patient", "kind", "file", "created_at")
-    list_filter = ("kind",)
-    search_fields = ("patient__nombre", "patient__dni", "name")
-    autocomplete_fields = ("patient",)
-    list_per_page = 50
+    list_display = ("id","patient","kind","name","created_at")
+    list_filter = ("kind","created_at")
+    search_fields = ("patient__nombre","patient__dni","name")
