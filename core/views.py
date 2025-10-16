@@ -2,6 +2,7 @@ from rest_framework import viewsets, permissions
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Patient, Attachment
 from .serializers import PatientSerializer, AttachmentSerializer
+from django.http import JsonResponse
 
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all().order_by("-created_at")
@@ -23,3 +24,7 @@ class AttachmentViewSet(viewsets.ModelViewSet):
         if self.action in ["create"]:
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
+# core/views.py (añadir al final)
+
+    def health(request):
+    return JsonResponse({"status": "ok"})
