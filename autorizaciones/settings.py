@@ -2,9 +2,9 @@ import os
 from pathlib import Path
 import dj_database_url
 
-# ---------------------------------------------------------
+# =========================
 # BASE
-# ---------------------------------------------------------
+# =========================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-secret-key")
@@ -24,9 +24,9 @@ CSRF_TRUSTED_ORIGINS = [
     ).split(",") if o.strip()
 ]
 
-# ---------------------------------------------------------
+# =========================
 # APPS
-# ---------------------------------------------------------
+# =========================
 INSTALLED_APPS = [
     # Django
     "django.contrib.admin",
@@ -36,18 +36,18 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Terceros
+    # 3rd
     "rest_framework",
     "corsheaders",
     "storages",
 
-    # App
+    # Local
     "core",
 ]
 
-# ---------------------------------------------------------
+# =========================
 # MIDDLEWARE
-# ---------------------------------------------------------
+# =========================
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -80,9 +80,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "autorizaciones.wsgi.application"
 
-# ---------------------------------------------------------
+# =========================
 # DATABASE
-# ---------------------------------------------------------
+# =========================
 DATABASES = {
     "default": dj_database_url.config(
         default=os.getenv("DATABASE_URL", ""),
@@ -90,9 +90,9 @@ DATABASES = {
     )
 }
 
-# ---------------------------------------------------------
+# =========================
 # PASSWORDS
-# ---------------------------------------------------------
+# =========================
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 10}},
@@ -100,17 +100,17 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# ---------------------------------------------------------
+# =========================
 # I18N / TZ
-# ---------------------------------------------------------
+# =========================
 LANGUAGE_CODE = "es-ar"
 TIME_ZONE = "America/Argentina/Buenos_Aires"
 USE_I18N = True
 USE_TZ = True
 
-# ---------------------------------------------------------
+# =========================
 # STATIC / MEDIA
-# ---------------------------------------------------------
+# =========================
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
@@ -126,22 +126,22 @@ if USE_S3:
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
     SPACES_NAME = os.getenv("SPACES_NAME")
     SPACES_REGION = os.getenv("SPACES_REGION")
-    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")  # https://sfo3.digitaloceanspaces.com
-    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")  # ejemplo: autorizaciones.sfo3.digitaloceanspaces.com
+    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")  # p.ej. https://sfo3.digitaloceanspaces.com
+    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")  # p.ej. autorizaciones.sfo3.digitaloceanspaces.com
 
     if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SPACES_NAME, SPACES_ENDPOINT, AWS_S3_CUSTOM_DOMAIN]):
         raise RuntimeError("Faltan variables de entorno para S3/Spaces.")
 
+    # Media en Spaces
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-    AWS_S3_ENDPOINT_URL = SPACES_ENDPOINT
     AWS_STORAGE_BUCKET_NAME = SPACES_NAME
-
-    # Recomendados para links públicos y nombres únicos
+    AWS_S3_ENDPOINT_URL = SPACES_ENDPOINT
+    AWS_S3_REGION_NAME = SPACES_REGION
     AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_S3_ADDRESSING_STYLE = "virtual"
     AWS_DEFAULT_ACL = None
     AWS_S3_FILE_OVERWRITE = False
-    AWS_QUERYSTRING_AUTH = False  # URLs limpias, sin firmas expiring
-
+    AWS_QUERYSTRING_AUTH = False  # URLs públicas limpias
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
 else:
     MEDIA_URL = "/media/"
@@ -149,9 +149,9 @@ else:
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ---------------------------------------------------------
-# Seguridad
-# ---------------------------------------------------------
+# =========================
+# SECURITY
+# =========================
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
@@ -162,13 +162,12 @@ SECURE_HSTS_PRELOAD = not DEBUG
 X_FRAME_OPTIONS = "DENY"
 REFERRER_POLICY = "same-origin"
 
-# ---------------------------------------------------------
+# =========================
 # DRF / CORS
-# ---------------------------------------------------------
+# =========================
 REST_FRAMEWORK = {
-    # Dejamos SessionAuthentication por defecto para panel/admin,
-    # pero en las vistas públicas vamos a EXENTAR CSRF solo en create.
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        # Mantener SessionAuth para admin/panel; exentamos CSRF sólo en create (ver views.py)
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -178,12 +177,12 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 50,
 }
 
-CORS_ALLOWED_ORIGINS = []  # mismo origen; si usás dominio distinto para el formulario, agregalo aquí
+CORS_ALLOWED_ORIGINS = []
 CORS_ALLOW_CREDENTIALS = True
 
-# ---------------------------------------------------------
-# Login
-# ---------------------------------------------------------
+# =========================
+# LOGIN
+# =========================
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/panel/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
