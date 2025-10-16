@@ -81,11 +81,11 @@ TEMPLATES = [
 WSGI_APPLICATION = "autorizaciones.wsgi.application"
 
 # =========================
-# DATABASE
+# DATABASE (DigitalOcean / Render / etc)
 # =========================
 DATABASES = {
     "default": dj_database_url.config(
-        default=os.getenv("DATABASE_URL", ""),
+        default=os.getenv("DATABASE_URL", ""),  # ej: postgres://user:pass@host:5432/db
         conn_max_age=600,
     )
 }
@@ -119,18 +119,16 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}
 }
 
-# =========================
-# STORAGE (DigitalOcean Spaces)
-# =========================
+# ======== DIGITALOCEAN SPACES (MEDIA) ========
 USE_S3 = os.getenv("USE_S3", "True") == "True"
 
 if USE_S3:
     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-    SPACES_NAME = os.getenv("SPACES_NAME")
-    SPACES_REGION = os.getenv("SPACES_REGION")                 # ej: sfo3
-    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")             # ej: https://sfo3.digitaloceanspaces.com (SIN barra final)
-    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")   # ej: mi-bucket.sfo3.digitaloceanspaces.com
+    SPACES_NAME = os.getenv("SPACES_NAME")                           # bucket
+    SPACES_REGION = os.getenv("SPACES_REGION")                       # ej: sfo3
+    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")                   # ej: https://sfo3.digitaloceanspaces.com (SIN barra final)
+    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")         # ej: <bucket>.<region>.digitaloceanspaces.com
 
     if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SPACES_NAME, SPACES_REGION, SPACES_ENDPOINT, AWS_S3_CUSTOM_DOMAIN]):
         raise RuntimeError("Faltan variables de entorno para S3/Spaces.")
@@ -139,13 +137,11 @@ if USE_S3:
     AWS_STORAGE_BUCKET_NAME = SPACES_NAME
     AWS_S3_ENDPOINT_URL = SPACES_ENDPOINT
     AWS_S3_REGION_NAME = SPACES_REGION
-
-    # Claves para DO Spaces
     AWS_S3_SIGNATURE_VERSION = "s3v4"
-    AWS_S3_ADDRESSING_STYLE = "virtual"   # si /diag/storage/ fallara, probar "path"
+    AWS_S3_ADDRESSING_STYLE = "virtual"  # si /diag/storage/ falla, probá "path"
     AWS_DEFAULT_ACL = None
     AWS_S3_FILE_OVERWRITE = False
-    AWS_QUERYSTRING_AUTH = False          # URLs públicas limpias
+    AWS_QUERYSTRING_AUTH = False         # URLs públicas limpias
 
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
 else:
@@ -171,7 +167,7 @@ REFERRER_POLICY = "same-origin"
 # DRF / CORS
 # =========================
 REST_FRAMEWORK = {
-    # Mantenemos SessionAuth para panel/admin; las vistas públicas exentan CSRF SOLO en create (en views.py).
+    # Panel/Admin con sesión; exentamos CSRF SOLO en create (ver views.py)
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],
@@ -182,7 +178,7 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 50,
 }
 
-CORS_ALLOWED_ORIGINS = []     # si servís el panel/QR en otro dominio, agregalo aquí
+CORS_ALLOWED_ORIGINS = []  # si servís front en otro dominio, agregalo aquí
 CORS_ALLOW_CREDENTIALS = True
 
 # =========================
