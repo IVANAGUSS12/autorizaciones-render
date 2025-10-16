@@ -26,6 +26,6 @@ urlpatterns = [
     path('diag/storage/', storage_diag, name='storage_diag'),
 ]
 
-# solo en dev local cuando USE_S3=False y DEBUG=True
+# Solo en dev local cuando USE_S3=False y DEBUG=True
 if settings.DEBUG and not settings.USE_S3:
     urlpatterns += static(settings.MEDIA_URL, document_root=getattr(settings, "MEDIA_ROOT", None))
