@@ -17,15 +17,16 @@ urlpatterns = [
     path('v1/', include(router.urls)),
     path('accounts/', include('django.contrib.auth.urls')),
 
+    # Front
     path('', TemplateView.as_view(template_name='public/index.html'), name='public_form'),
     path('gracias.html', TemplateView.as_view(template_name='public/gracias.html'), name='gracias'),
     path('panel/', login_required(TemplateView.as_view(template_name='panel/index.html')), name='panel_index'),
 
-    # Health + Diagnóstico de storage
+    # Salud + Diagnóstico de storage
     path('health/', health, name='health_check'),
     path('diag/storage/', storage_diag, name='storage_diag'),
 ]
 
-# Solo en dev local cuando USE_S3=False y DEBUG=True
+# Servir media SOLO si no usás S3 y estás en DEBUG
 if settings.DEBUG and not settings.USE_S3:
     urlpatterns += static(settings.MEDIA_URL, document_root=getattr(settings, "MEDIA_ROOT", None))
