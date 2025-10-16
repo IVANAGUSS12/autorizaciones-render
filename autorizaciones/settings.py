@@ -9,7 +9,8 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = [
     h.strip() for h in os.environ.get(
-        "ALLOWED_HOSTS", ".onrender.com,.ondigitalocean.app,localhost,127.0.0.1"
+        "ALLOWED_HOSTS",
+        ".onrender.com,.ondigitalocean.app,localhost,127.0.0.1"
     ).split(",") if h.strip()
 ]
 CSRF_TRUSTED_ORIGINS = [
@@ -121,9 +122,7 @@ LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/panel/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
 
-# -------------------------------------------------------------
-# ⚙️ CONFIGURACIÓN DE STORAGE (para resolver el KeyError 'default')
-# -------------------------------------------------------------
+# ---------- STORAGE (soluciona el InvalidStorageError 'default') ----------
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
