@@ -34,12 +34,6 @@ class Patient(models.Model):
 
 
 def attachment_upload_to(instance, filename):
-    """
-    Ruta de subida resiliente:
-    - NO depende de created_at (que aún no existe antes del save).
-    - Usa patient_id si existe o 'tmp' si todavía no.
-    - Genera un nombre único con UUID y conserva la extensión.
-    """
     base, ext = os.path.splitext(filename)
     ext = (ext or "").lower()
     pid = instance.patient_id or "tmp"
@@ -61,7 +55,6 @@ class Attachment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
-        # Si no vino nombre, usamos el nombre del archivo subido
         if not self.name and self.file and hasattr(self.file, "name"):
             self.name = os.path.basename(self.file.name)
         super().save(*args, **kwargs)
@@ -75,3 +68,4 @@ class Attachment(models.Model):
 
     def __str__(self):
         return f"{self.patient} - {self.kind} - {self.name or os.path.basename(self.file.name)}"
+
