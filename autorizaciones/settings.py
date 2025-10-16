@@ -2,28 +2,33 @@ import os
 from pathlib import Path
 import dj_database_url
 
+# ---------------------------------------------------------
+# BASE
+# ---------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# =======================
-# Básicos
-# =======================
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "unsafe-secret-key")
-DEBUG = os.environ.get("DEBUG", "False") == "True"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-secret-key")
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get(
-    "ALLOWED_HOSTS",
-    ".ondigitalocean.app,localhost,127.0.0.1"
-).split(",") if h.strip()]
+ALLOWED_HOSTS = [
+    h.strip() for h in os.getenv(
+        "ALLOWED_HOSTS",
+        ".ondigitalocean.app,localhost,127.0.0.1"
+    ).split(",") if h.strip()
+]
 
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get(
-    "CSRF_TRUSTED_ORIGINS",
-    "https://*.ondigitalocean.app"
-).split(",") if o.strip()]
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "https://*.ondigitalocean.app"
+    ).split(",") if o.strip()
+]
 
-# =======================
-# Apps
-# =======================
+# ---------------------------------------------------------
+# APPS
+# ---------------------------------------------------------
 INSTALLED_APPS = [
+    # Django
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -31,19 +36,21 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
+    # Terceros
     "rest_framework",
     "corsheaders",
+    "storages",               # <— para S3/Spaces
 
-    "core",  # tu app
+    # Tu app
+    "core",
 ]
 
-# =======================
-# Middleware (Whitenoise 2º)
-# =======================
+# ---------------------------------------------------------
+# MIDDLEWARE
+# ---------------------------------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
-
+    "whitenoise.middleware.WhiteNoiseMiddleware",   # <— static en producción
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -73,34 +80,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "autorizaciones.wsgi.application"
 
-# =======================
-# Base de Datos (DATABASE_URL)
-# =======================
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if DATABASE_URL:
-    DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=600,
-            ssl_require=True,
-        )
-    }
-else:
-    # Fallback (local)
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("DB_NAME", "autorizaciones"),
-            "USER": os.getenv("DB_USER", "postgres"),
-            "PASSWORD": os.getenv("DB_PASSWORD", ""),
-            "HOST": os.getenv("DB_HOST", "localhost"),
-            "PORT": os.getenv("DB_PORT", "5432"),
-        }
-    }
+# ---------------------------------------------------------
+# DATABASE (usa DATABASE_URL del entorno)
+# ---------------------------------------------------------
+DATABASES = {
+    "default": dj_database_url.config(
+        default=os.getenv("DATABASE_URL", ""),
+        conn_max_age=600,
+    )
+}
 
-# =======================
-# Passwords
-# =======================
+# ---------------------------------------------------------
+# PASSWORDS
+# ---------------------------------------------------------
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 10}},
@@ -108,56 +100,57 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# =======================
-# i18n
-# =======================
+# ---------------------------------------------------------
+# I18N / TZ
+# ---------------------------------------------------------
 LANGUAGE_CODE = "es-ar"
 TIME_ZONE = "America/Argentina/Buenos_Aires"
 USE_I18N = True
 USE_TZ = True
 
-# =======================
-# Static (Whitenoise)
-# =======================
+# ---------------------------------------------------------
+# STATIC / MEDIA
+#   - STATIC: Whitenoise (local en el contenedor)
+#   - MEDIA: DO Spaces (S3) si USE_S3=True; si no, filesystem
+# ---------------------------------------------------------
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-# si tenés /static en tu repo, dejalo; si no, podés quitar esta línea
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+WHITENOISE_MAX_AGE = 60 * 60 * 24 * 30
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    }
+}
 
-# =======================
-# Media (S3 o local)
-# =======================
-USE_S3 = os.getenv("USE_S3", "False") == "True"
+USE_S3 = os.getenv("USE_S3", "True") == "True"
 
 if USE_S3:
-    INSTALLED_APPS += ["storages"]
-
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-
-    AWS_S3_REGION_NAME = os.getenv("SPACES_REGION", "sfo3")
-    AWS_S3_ENDPOINT_URL = os.getenv("SPACES_ENDPOINT", "https://sfo3.digitaloceanspaces.com")
-    AWS_STORAGE_BUCKET_NAME = os.getenv("SPACES_NAME")
-    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN", "")
-
     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    SPACES_NAME = os.getenv("SPACES_NAME")
+    SPACES_REGION = os.getenv("SPACES_REGION")
+    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")  # p.ej. https://sfo3.digitaloceanspaces.com
+    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")  # p.ej. autorizaciones.sfo3.digitaloceanspaces.com
 
-    AWS_DEFAULT_ACL = "public-read"
-    AWS_S3_ADDRESSING_STYLE = "virtual"       # <bucket>.sfo3.digitaloceanspaces.com
-    AWS_QUERYSTRING_AUTH = False               # URLs limpias
-    AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+    if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SPACES_NAME, SPACES_ENDPOINT, AWS_S3_CUSTOM_DOMAIN]):
+        raise RuntimeError("Faltan variables de entorno para S3/Spaces.")
 
-    MEDIA_URL = os.getenv("MEDIA_URL", f"https://{AWS_S3_CUSTOM_DOMAIN}/")
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    AWS_S3_ENDPOINT_URL = SPACES_ENDPOINT
+    AWS_STORAGE_BUCKET_NAME = SPACES_NAME
+
+    # Ruta pública para servir los adjuntos
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
 else:
     MEDIA_URL = "/media/"
     MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# =======================
-# Seguridad (recomendado)
-# =======================
+# ---------------------------------------------------------
+# Seguridad
+# ---------------------------------------------------------
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
@@ -168,22 +161,26 @@ SECURE_HSTS_PRELOAD = not DEBUG
 X_FRAME_OPTIONS = "DENY"
 REFERRER_POLICY = "same-origin"
 
-# =======================
+# ---------------------------------------------------------
 # DRF / CORS
-# =======================
+# ---------------------------------------------------------
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
-    # Para el QR público podes abrirlo. Cuando termines de probar,
-    # cambiá a IsAuthenticatedOrReadOnly
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly"
+    ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
 }
 
-CORS_ALLOWED_ORIGINS = []     # si necesitás, agregá dominios front
+CORS_ALLOWED_ORIGINS = []
 CORS_ALLOW_CREDENTIALS = True
 
+# ---------------------------------------------------------
+# Login
+# ---------------------------------------------------------
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/panel/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
-
