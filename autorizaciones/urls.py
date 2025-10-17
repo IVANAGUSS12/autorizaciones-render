@@ -1,12 +1,12 @@
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
-from django.conf.urls.static import static
+from django.views.static import serve as static_serve
 from rest_framework.routers import DefaultRouter
 
-from core.views import PatientViewSet, AttachmentViewSet, health, storage_diag
+from core.views import PatientViewSet, AttachmentViewSet, health, storage_diag, echo_diag
 
 router = DefaultRouter()
 router.register(r'patients', PatientViewSet, basename='patient')
@@ -25,8 +25,8 @@ urlpatterns = [
     # Health / Diag
     path('health/', health, name='health'),
     path('diag/storage/', storage_diag, name='storage_diag'),
-]
+    path('diag/echo/', echo_diag, name='echo_diag'),
 
-# Solo útil si NO usás S3 y DEBUG=True
-if settings.DEBUG and not settings.USE_S3:
-    urlpatterns += static(settings.MEDIA_URL, document_root=getattr(settings, "MEDIA_ROOT", None))
+    # SERVIR MEDIA SIEMPRE (hotfix)
+    re_path(r'^media/(?P<path>.*)$', static_serve, {'document_root': settings.MEDIA_ROOT}),
+]
