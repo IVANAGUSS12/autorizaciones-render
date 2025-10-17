@@ -61,13 +61,11 @@
               <label>Cobertura médica *</label>
               <input list="obrasList" name="cobertura" id="cobertura" required placeholder="Escribí para buscar o ingresá manualmente">
               <datalist id="obrasList"></datalist>
-              <div class="help">Escribí para buscar. Si no aparece, ingresá el nombre tal como figura en tu credencial.</div>
             </div>
             <div>
               <label>Médico tratante *</label>
               <input list="medicosList" name="medico" id="medico" required placeholder="Escribí para buscar o ingresá manualmente">
               <datalist id="medicosList"></datalist>
-              <div class="help">Escribí parte del apellido/nombre para filtrar. Si no figura, ingresalo manualmente.</div>
             </div>
           </div>
 
@@ -113,7 +111,7 @@
   <a class="wpp" href="https://wa.me/5491155922359" target="_blank" rel="noopener">WhatsApp</a>
 
   <script>
-    const BASE = '';
+    const BASE = '';  // mismo dominio
     const MAX = 15 * 1024 * 1024;
 
     const MEDICOS = ["ABALO EDUARDO","ADROGUE LUIS","BARBIERI PABLO","CARRIZO JUAN","CHAVEZ ARIEL","CONSTANZA EDUARDO",
@@ -122,82 +120,53 @@
       "PINOTTI NORBERTO","SANNA HERNAN","SERE IGNACIO","TORGA SPAK ROGER","VALENTINI ROBERTO","VILLA NATALIA",
       "YAVEN IGNACIO","YEREGUI SANTIAGO"].sort((a,b)=>a.localeCompare(b));
 
-    const OBRAS = ["ACMED S.A","AMEPBA","ANDAR","APRES S.A.","APSOT","ASOC.MEDICA DEL DPTO. CASTELLANOS",
-      "ASOCIACION MUTUAL RURALISTA","ASOCIACION MUTUAL SANCOR SALUD","ASOCIART S.A.(ART)","AVALIAN","OMINT","OSDE",
-      "SWISS MEDICAL","GALENO","MEDIFE","MEDICUS","PARTICULAR"].sort((a,b)=>a.localeCompare(b));
+    const OBRAS = ["ACMED S.A","AMEPBA","ANDAR","APRES S.A.","APSOT","ASOCIACION MUTUAL RURALISTA","ASOCIACION MUTUAL SANCOR SALUD",
+      "ASOCIART S.A.(ART)","AVALIAN","OMINT","OSDE","SWISS MEDICAL","GALENO","MEDIFE","MEDICUS","PARTICULAR"].sort((a,b)=>a.localeCompare(b));
 
     function fillLists(){
-      const dlMed = document.getElementById('medicosList');
-      const dlObr = document.getElementById('obrasList');
-      MEDICOS.forEach(v=>{ const o=document.createElement('option'); o.value=v; dlMed.appendChild(o); });
-      OBRAS.forEach(v=>{ const o=document.createElement('option'); o.value=v; dlObr.appendChild(o); });
-    }
-
-    async function createPatient(payload){
-      const r = await fetch(BASE + '/v1/patients/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if(!r.ok) throw new Error('Error creando paciente');
-      return await r.json();
-    }
-
-    async function uploadAttachment(patientId, kind, file){
-      const fd = new FormData();
-      fd.append('patient', patientId);
-      fd.append('kind', kind);
-      fd.append('file', file);
-      const r = await fetch(BASE + '/v1/attachments/', { method: 'POST', body: fd });
-      if(!r.ok) throw new Error('Error subiendo ' + kind);
-      return await r.json();
+      const dlMed=document.getElementById('medicosList'), dlObr=document.getElementById('obrasList');
+      MEDICOS.forEach(v=>{const o=document.createElement('option');o.value=v;dlMed.appendChild(o);});
+      OBRAS.forEach(v=>{const o=document.createElement('option');o.value=v;dlObr.appendChild(o);});
     }
 
     function validateFiles(files){
-      for (const f of files){ if (f && f.size > MAX) return false; }
+      for(const f of files){ if(f && f.size>MAX) return false; }
       return true;
     }
 
-    window.addEventListener('load', () => {
+    window.addEventListener('load',()=>{
       fillLists();
-      const form = document.getElementById('form');
-      const ok = document.getElementById('ok');
-      const err = document.getElementById('err');
-      const btn = document.getElementById('sendBtn');
+      const form=document.getElementById('form');
+      const ok=document.getElementById('ok');
+      const err=document.getElementById('err');
+      const btn=document.getElementById('sendBtn');
 
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
+      form.addEventListener('submit', async(ev)=>{
+        ev.preventDefault();
         err.style.display='none'; ok.style.display='none';
 
         const f1=form.orden_medica.files[0], f2=form.dni_file.files[0], f3=form.credencial.files[0], f4=form.orden_materiales.files[0];
         if(!f1||!f2||!f3){ err.textContent='Adjuntá la orden médica, DNI y credencial.'; err.style.display='block'; return; }
         if(!validateFiles([f1,f2,f3,f4])){ err.textContent='Cada archivo debe pesar hasta 15 MB.'; err.style.display='block'; return; }
 
-        const payload = {
-          nombre: form.nombre.value.trim(),
-          dni: form.dni.value.trim(),
-          email: form.email.value.trim(),
-          telefono: form.telefono.value.trim(),
-          cobertura: form.cobertura.value.trim(),
-          medico: form.medico.value.trim(),
-          observaciones: form.observaciones.value.trim(),
-          fecha_cx: form.fecha_cx.value || null,
-          sector_code: form.sector_code.value
-        };
+        const fd = new FormData(form);
+        fd.append('sector_code', form.sector_code.value);
+        fd.append('fecha_cx', form.fecha_cx.value || '');
+        fd.append('estado','Pendiente');
 
         btn.disabled=true; btn.textContent='Enviando…';
         try{
-          const patient = await createPatient(payload);
-          const id = patient.id;
-          await uploadAttachment(id, 'orden', f1);
-          await uploadAttachment(id, 'dni', f2);
-          await uploadAttachment(id, 'credencial', f3);
-          if (f4) await uploadAttachment(id, 'materiales', f4);
+          const r = await fetch(BASE+'/v1/patients/', { method:'POST', body: fd });
+          const data = await r.json();
+          if(!r.ok){
+            const det = data.errors ? JSON.stringify(data.errors) : (data.error||'Error creando paciente');
+            throw new Error(det);
+          }
           ok.style.display='block';
-          setTimeout(()=>{ window.location.href = './gracias.html'; }, 700);
+          setTimeout(()=>{ window.location.href='./gracias.html'; }, 800);
         }catch(e){
           console.error(e);
-          err.textContent = 'No se pudo enviar (' + (e.message||e) + ')';
+          err.textContent='No se pudo enviar ('+(e.message||e)+')';
           err.style.display='block';
         }finally{
           btn.disabled=false; btn.textContent='Enviar solicitud';
