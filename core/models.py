@@ -32,7 +32,7 @@ class Patient(models.Model):
         return f"{self.nombre} ({self.dni})"
 
 def attachment_upload_to(instance, filename):
-    ext = os.path.splitext(filename)[1]
+    ext = os.path.splitext(filename)[1].lower()
     pid = instance.patient_id or "tmp"
     today = timezone.now().strftime("%Y/%m/%d")
     return f"adjuntos/{pid}/{today}/{uuid.uuid4().hex}{ext}"
@@ -63,3 +63,5 @@ class Attachment(models.Model):
         except Exception:
             return ""
 
+    def __str__(self):
+        return f"{self.patient} - {self.kind} - {self.name or os.path.basename(self.file.name)}"
