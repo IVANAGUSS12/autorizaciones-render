@@ -15,3 +15,8 @@ class PatientSerializer(serializers.ModelSerializer):
             "id","nombre","dni","email","telefono","cobertura","medico",
             "observaciones","fecha_cx","sector_code","estado","created_at","attachments"
         ]
+        extra_kwargs = {
+            # dejá obligatorios los que usás en QR
+            "observaciones": {"required": False, "allow_blank": True},
+            "fecha_cx": {"required": False, "allow_null": True},
+        }
