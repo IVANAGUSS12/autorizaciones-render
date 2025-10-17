@@ -8,7 +8,7 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-secret-key")
-DEBUG = os.getenv("DEBUG", "False") == "True"
+DEBUG = os.getenv("DEBUG", "True") == "True"   # Hotfix: True por ahora
 
 ALLOWED_HOSTS = [".ondigitalocean.app", "localhost", "127.0.0.1"]
 CSRF_TRUSTED_ORIGINS = ["https://*.ondigitalocean.app"]
@@ -28,7 +28,6 @@ INSTALLED_APPS = [
     # 3rd
     "rest_framework",
     "corsheaders",
-    "storages",
 
     # Local
     "core",
@@ -39,7 +38,6 @@ INSTALLED_APPS = [
 # =========================
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -94,60 +92,24 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# WhiteNoise para estáticos
-STORAGES = {
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}
-}
-
-# ======== DIGITALOCEAN SPACES (MEDIA) ========
-USE_S3 = os.getenv("USE_S3", "True") == "True"
-
-if USE_S3:
-    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-    SPACES_NAME = os.getenv("SPACES_NAME")                  # bucket
-    SPACES_REGION = os.getenv("SPACES_REGION")              # ej: sfo3
-    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")          # ej: https://sfo3.digitaloceanspaces.com (sin / final)
-    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")# ej: <bucket>.sfo3.digitaloceanspaces.com
-
-    required = [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SPACES_NAME, SPACES_REGION, SPACES_ENDPOINT, AWS_S3_CUSTOM_DOMAIN]
-    if not all(required):
-        raise RuntimeError("Faltan variables de entorno para S3/Spaces")
-
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-    AWS_STORAGE_BUCKET_NAME = SPACES_NAME
-    AWS_S3_ENDPOINT_URL = SPACES_ENDPOINT
-    AWS_S3_REGION_NAME = SPACES_REGION
-    AWS_S3_SIGNATURE_VERSION = "s3v4"
-    AWS_S3_ADDRESSING_STYLE = "virtual"
-    AWS_DEFAULT_ACL = None
-    AWS_S3_FILE_OVERWRITE = False
-    AWS_QUERYSTRING_AUTH = False
-
-    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
-else:
-    MEDIA_URL = "/media/"
-    MEDIA_ROOT = BASE_DIR / "media"
+# Hotfix: SERVIR MEDIA LOCAL EN PRODUCCIÓN
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # =========================
-# SECURITY
+# SECURITY (relajado por hotfix)
 # =========================
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
-SECURE_SSL_REDIRECT = not DEBUG
-SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
-SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
-SECURE_HSTS_PRELOAD = not DEBUG
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+SECURE_SSL_REDIRECT = False
 X_FRAME_OPTIONS = "DENY"
-REFERRER_POLICY = "same-origin"
 
 # =========================
-# DRF / CORS
+# DRF / CORS (abierto por hotfix)
 # =========================
-# Hotfix: AllowAny global (después se puede endurecer)
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
@@ -162,8 +124,11 @@ CORS_ALLOW_CREDENTIALS = True
 SESSION_COOKIE_SAMESITE = None
 
 # =========================
-# LOGIN
+# LOGGING a consola (para ver errores reales)
 # =========================
-LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/panel/"
-LOGOUT_REDIRECT_URL = "/accounts/login/"
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "INFO"},
+}
