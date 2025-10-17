@@ -2,10 +2,12 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django.http import JsonResponse
+import logging
 
 from .models import Patient, Attachment
 from .serializers import PatientSerializer, AttachmentSerializer
 
+log = logging.getLogger(__name__)
 
 class PublicReadCreatePermission(permissions.BasePermission):
     """
@@ -18,7 +20,6 @@ class PublicReadCreatePermission(permissions.BasePermission):
             return True
         return bool(request.user and request.user.is_authenticated and request.user.is_staff)
 
-
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all().order_by("-created_at")
     serializer_class = PatientSerializer
@@ -26,12 +27,13 @@ class PatientViewSet(viewsets.ModelViewSet):
     permission_classes = [PublicReadCreatePermission]
 
     def create(self, request, *args, **kwargs):
+        log.info("Patient create - content_type=%s keys=%s", request.content_type, list(request.data.keys()))
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
+            log.warning("Patient invalid: %s", serializer.errors)
             return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         patient = serializer.save()
         return Response(self.get_serializer(patient).data, status=status.HTTP_201_CREATED)
-
 
 class AttachmentViewSet(viewsets.ModelViewSet):
     queryset = Attachment.objects.select_related("patient").order_by("-created_at")
@@ -40,14 +42,15 @@ class AttachmentViewSet(viewsets.ModelViewSet):
     permission_classes = [PublicReadCreatePermission]
 
     def create(self, request, *args, **kwargs):
+        log.info("Attachment create - content_type=%s keys=%s", request.content_type, list(request.data.keys()))
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
+            log.warning("Attachment invalid: %s", serializer.errors)
             return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         obj = serializer.save()
         return Response(self.get_serializer(obj).data, status=status.HTTP_201_CREATED)
 
-
-# ---- Health & Storage diag ----
+# ---- Health & Diagnostics ----
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -60,8 +63,7 @@ def health(request):
 @csrf_exempt
 def storage_diag(request):
     """
-    Prueba escritura/lectura en DEFAULT_FILE_STORAGE.
-    Si falla, attachments no van a poder guardarse.
+    Prueba escritura/lectura en DEFAULT_FILE_STORAGE (ahora local).
     """
     try:
         name = "diag/diagnostico.txt"
@@ -74,3 +76,21 @@ def storage_diag(request):
             {"ok": False, "error": str(e), "traceback": traceback.format_exc()},
             status=500
         )
+
+@csrf_exempt
+def echo_diag(request):
+    """
+    Muestra exactamente lo que llega (para depurar el QR).
+    """
+    try:
+        info = {
+            "method": request.method,
+            "content_type": request.content_type,
+            "POST_keys": list(request.POST.keys()),
+            "FILES_keys": list(request.FILES.keys()),
+            "DATA_keys": list(getattr(request, "data", {}))
+        }
+        return JsonResponse({"ok": True, "info": info})
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
