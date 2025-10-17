@@ -6,7 +6,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 
-from core.views import PatientViewSet, AttachmentViewSet, health
+from core.views import PatientViewSet, AttachmentViewSet, health, storage_diag
 
 router = DefaultRouter()
 router.register(r'patients', PatientViewSet, basename='patient')
@@ -22,10 +22,11 @@ urlpatterns = [
     path('gracias.html', TemplateView.as_view(template_name='public/gracias.html'), name='gracias'),
     path('panel/', login_required(TemplateView.as_view(template_name='panel/index.html')), name='panel'),
 
-    # Health
+    # Health / Diag
     path('health/', health, name='health'),
+    path('diag/storage/', storage_diag, name='storage_diag'),
 ]
 
-# Servir media SOLO si USE_S3=False y DEBUG=True
+# Solo útil si NO usás S3 y DEBUG=True
 if settings.DEBUG and not settings.USE_S3:
     urlpatterns += static(settings.MEDIA_URL, document_root=getattr(settings, "MEDIA_ROOT", None))
