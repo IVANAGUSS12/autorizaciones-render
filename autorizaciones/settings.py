@@ -93,7 +93,8 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-WHITENOISE_MAX_AGE = 60 * 60 * 24 * 30
+
+# WhiteNoise para estáticos
 STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}
 }
@@ -106,7 +107,7 @@ if USE_S3:
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
     SPACES_NAME = os.getenv("SPACES_NAME")                  # bucket
     SPACES_REGION = os.getenv("SPACES_REGION")              # ej: sfo3
-    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")          # ej: https://sfo3.digitaloceanspaces.com (SIN / final)
+    SPACES_ENDPOINT = os.getenv("SPACES_ENDPOINT")          # ej: https://sfo3.digitaloceanspaces.com (sin / final)
     AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")# ej: <bucket>.sfo3.digitaloceanspaces.com
 
     required = [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SPACES_NAME, SPACES_REGION, SPACES_ENDPOINT, AWS_S3_CUSTOM_DOMAIN]
@@ -118,10 +119,10 @@ if USE_S3:
     AWS_S3_ENDPOINT_URL = SPACES_ENDPOINT
     AWS_S3_REGION_NAME = SPACES_REGION
     AWS_S3_SIGNATURE_VERSION = "s3v4"
-    AWS_S3_ADDRESSING_STYLE = "virtual"   # si algo raro, probar "path"
+    AWS_S3_ADDRESSING_STYLE = "virtual"
     AWS_DEFAULT_ACL = None
     AWS_S3_FILE_OVERWRITE = False
-    AWS_QUERYSTRING_AUTH = False          # URLs públicas limpias
+    AWS_QUERYSTRING_AUTH = False
 
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
 else:
@@ -146,18 +147,19 @@ REFERRER_POLICY = "same-origin"
 # =========================
 # DRF / CORS
 # =========================
+# Hotfix: AllowAny global (después se puede endurecer)
 REST_FRAMEWORK = {
-    # Panel/Admin con sesión; el QR solo necesita AllowAny en create (ver views.py)
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticatedOrReadOnly"
+        "rest_framework.permissions.AllowAny"
     ],
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+SESSION_COOKIE_SAMESITE = None
 
 # =========================
 # LOGIN
